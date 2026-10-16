@@ -31,18 +31,28 @@ export const HOT_MS = 6000
 /** Known external runtimes: when Bash calls one, the map shows a process node. */
 const PROCESS_PATTERNS: [RegExp, string][] = [
   [/\bpython3?\b/, 'python'],
+  [/\bpytest\b/, 'pytest'],
+  [/\buv\b/, 'uv'],
+  [/\bpoetry\b/, 'poetry'],
+  [/\bpip3?\b/, 'pip'],
+  [/\bconda\b/, 'conda'],
   [/\bnode\b/, 'node'],
   [/\bnpx\b/, 'npx'],
-  [/\bnpm\s+run\b/, 'npm'],
+  [/\bnpm\s+run\b|\bnpm\s+test\b/, 'npm'],
   [/\byarn\b/, 'yarn'],
   [/\bpnpm\b/, 'pnpm'],
   [/\bbun\b/, 'bun'],
   [/\bdeno\b/, 'deno'],
+  [/\bvitest\b/, 'vitest'],
+  [/\bjest\b/, 'jest'],
   [/\bruby\b/, 'ruby'],
   [/\bperl\b/, 'perl'],
   [/\bjava\b/, 'java'],
-  [/\bgo\s+run\b/, 'go'],
-  [/\bcargo\s+run\b/, 'cargo'],
+  [/\bgradlew?\b/, 'gradle'],
+  [/\bmvn\b/, 'mvn'],
+  [/\bdotnet\b/, 'dotnet'],
+  [/\bgo\s+run\b|\bgo\s+test\b/, 'go'],
+  [/\bcargo\s+run\b|\bcargo\s+test\b/, 'cargo'],
   [/\brushc\b/, 'rustc'],
   [/\bdocker\b/, 'docker'],
   [/\bkubectl\b/, 'kubectl'],
@@ -53,6 +63,9 @@ const PROCESS_PATTERNS: [RegExp, string][] = [
   [/\bpowershell\b|\.ps1\b/, 'powershell'],
   [/\bcurl\b/, 'curl'],
   [/\bwget\b/, 'wget'],
+  [/\bgit\b/, 'git'],
+  [/\bsleep\b/, 'sleep'],
+  [/\bwait\b/, 'wait'],
 ]
 
 /** A packet's flight from sender to receiver, and the flash when it lands. */
@@ -323,19 +336,38 @@ export function stepEnd(g: AgentFlowGraph, id: string, usage: UsageFacts | null,
   a.firstOut = undefined
 }
 
-export function toolStart(g: AgentFlowGraph, id: string, summary: string, now: number): void {
+export function toolStart(
+  g: AgentFlowGraph,
+  id: string,
+  summary: string,
+  now: number,
+  tool?: string,
+  detail?: string,
+): void {
   const a = agentOf(g, id, now)
   a.tools += 1
-  a.activity = clip(summary, 80)
+  a.activity = clip(summary, 120)
+  a.activeTool = tool
+  a.activeDetail = detail ? clip(detail, 500) : undefined
+  a.activeStartedAt = now
   a.lastActiveAt = now
   const log = a.toolLog ?? (a.toolLog = [])
-  log.push({ at: now, text: clip(summary, 120) })
+  const entry: { at: number; end?: number; text: string; tool?: string; detail?: string } = {
+    at: now,
+    text: clip(summary, 160),
+  }
+  if (tool !== undefined) entry.tool = tool
+  if (detail !== undefined) entry.detail = clip(detail, 500)
+  log.push(entry)
   if (log.length > TOOL_LOG_MAX) log.splice(0, log.length - TOOL_LOG_MAX)
 }
 
 export function toolEnd(g: AgentFlowGraph, id: string, now: number): void {
   const a = agentOf(g, id, now)
   a.activity = undefined
+  a.activeTool = undefined
+  a.activeDetail = undefined
+  a.activeStartedAt = undefined
   a.lastActiveAt = now
   const log = a.toolLog ?? []
   for (let i = log.length - 1; i >= 0; i -= 1) {
@@ -360,6 +392,10 @@ export function detectProcess(command: string): string | undefined {
   for (const [re, name] of PROCESS_PATTERNS) {
     if (re.test(command)) return name
   }
+  if (/\.py\b/.test(command)) return 'python'
+  if (/\.js\b|\.mjs\b|\.ts\b/.test(command)) return 'node'
+  if (/\.sh\b/.test(command)) return 'sh'
+  if (/\.ps1\b/.test(command)) return 'powershell'
   return undefined
 }
 
@@ -635,6 +671,32 @@ export function summarizeTool(tool: string, input: Record<string, unknown>): str
       return `SendMessage → ${str('to') ?? str('recipient') ?? ''}`
     default:
       return short ? `${tool} ${short}` : tool.replace(/^mcp__/, '').replace(/__/g, ' · ')
+  }
+}
+
+/** Detailed parameter of a tool call (e.g. command for Bash, file for Read/Write, pattern for Grep). */
+export function toolDetail(tool: string, input: Record<string, unknown>): string | undefined {
+  const str = (k: string) => (typeof input[k] === 'string' ? (input[k] as string) : undefined)
+  switch (tool) {
+    case 'Bash':
+      return str('command')
+    case 'Read':
+    case 'Write':
+    case 'Edit':
+    case 'NotebookEdit':
+      return str('file_path') ?? str('path') ?? str('notebook_path')
+    case 'Grep':
+    case 'Glob':
+      return [str('pattern'), str('path') ?? str('dir')].filter(Boolean).join(' in ')
+    case 'WebSearch':
+      return str('query')
+    case 'WebFetch':
+      return str('url')
+    case 'Agent':
+    case 'Task':
+      return str('prompt') ?? str('description')
+    default:
+      return str('command') ?? str('path') ?? str('query') ?? str('pattern') ?? str('description')
   }
 }
 

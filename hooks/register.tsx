@@ -797,7 +797,8 @@ export const register: Register = on => {
     const tool = String(e.tool)
     let processId: string | undefined
     track((g, now) => {
-      M.toolStart(g, id, M.summarizeTool(tool, args), now)
+      const detail = M.toolDetail(tool, args)
+      M.toolStart(g, id, M.summarizeTool(tool, args), now, tool, detail)
       if (tool === 'TodoWrite') M.setTodos(g, id, args.todos, now)
       if (tool === 'TaskUpdate' && typeof args.taskId === 'string') {
         M.taskUpdate(g, args.taskId, {
@@ -812,7 +813,7 @@ export const register: Register = on => {
         const description = typeof args.description === 'string' ? args.description : ''
         processId = M.processStart(g, id, command, description, now)
       }
-    }, tool === 'TodoWrite' || tool === 'TaskUpdate' || tool === 'Bash')
+    }, true)
     let out: Awaited<ReturnType<typeof next>> | undefined
     try {
       out = await next(e)
@@ -1009,7 +1010,7 @@ export const register: Register = on => {
               </>
             )}
             {running && a.tps > 0 ? <Text color="#FFE600"> ⚡{a.tps.toFixed(0)}</Text> : ''}
-            <Text color="#8888AA"> {a.activity ?? a.role}</Text>
+            <Text color="#8888AA"> {a.activity ? `${a.activity}${a.activeStartedAt ? ` [${Math.round((now - a.activeStartedAt) / 1000)}s]` : ''}` : a.role}</Text>
           </Text>,
         )
       }
@@ -1081,7 +1082,8 @@ export const register: Register = on => {
         )
       }
       const out = a.outTok + Math.round(a.liveOut)
-      const doing = a.activity ? `▶ ${a.activity}` : a.task ? `“${a.task}”` : a.role
+      const toolTimer = a.activeStartedAt ? ` (${Math.round((now - a.activeStartedAt) / 1000)}s)` : ''
+      const doing = a.activity ? `▶ ${a.activity}${toolTimer}` : a.task ? `“${a.task}”` : a.role
       const detailElapsed = a.endedAt ? Math.round((a.endedAt - a.startedAt) / 1000) : Math.round((now - a.startedAt) / 1000)
       rows.push(
         <Box flexDirection="row">
@@ -1112,6 +1114,11 @@ export const register: Register = on => {
             <Text color={a.activity ? '#FFFFFF' : '#9A9AC0'} wrap="truncate">
               {doing}
             </Text>
+            {a.activeDetail ? (
+              <Text color="#7FE7FF" wrap="truncate">
+                $ {a.activeDetail}
+              </Text>
+            ) : null}
             {a.isProcess ? (
               <Text color="#8888AA" wrap="truncate">
                 ⏱ {detailElapsed}s {a.result ? `· ${a.result.slice(0, 40)}` : ''}

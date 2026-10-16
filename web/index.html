@@ -188,13 +188,36 @@
   .todos li.completed::before { content: "◆"; color: var(--cyan); }
   .todos li.in_progress { color: var(--ink); }
   .todos li.in_progress::before { content: "▶"; color: var(--yellow); }
-  .tools { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
-  .tools li { display: grid; grid-template-columns: 1fr auto; gap: 10px; font-size: 13.5px; }
+  .tools { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .tools li { display: grid; grid-template-columns: 1fr auto; gap: 10px; font-size: 13.5px; padding: 4px 6px; background: rgba(255,255,255,.015); border-left: 2px solid transparent; }
+  .tools li.open { background: rgba(57, 255, 20, 0.05); border-left-color: var(--green); }
   .tools li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #ddd6ff; }
   .tools li span:last-child { font: 500 12px var(--num); color: var(--muted); }
-  .tools li.open span:last-child { color: var(--green); }
+  .tools li.open span:last-child { color: var(--green); font-weight: 600; }
+  .tool-cmd { grid-column: 1 / -1; margin-top: 3px; }
+  .tool-cmd code { display: block; padding: 4px 8px; background: rgba(0,0,0,0.3); font: 400 12px var(--num); color: #9f97c7; white-space: pre-wrap; word-break: break-all; }
   .quote { margin: 0; padding: 10px 12px; border-left: 2px solid var(--tone, var(--cyan)); background: rgba(255, 255, 255, .03);
     font-size: 14px; line-height: 1.5; color: #e0daf9; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+  /* live tool execution card */
+  .live-card { margin: 0 0 16px; padding: 12px 14px; background: rgba(0, 240, 255, 0.06); border: 1px solid rgba(0, 240, 255, 0.3); border-left: 3px solid var(--cyan); }
+  .live-card.long { background: rgba(255, 230, 0, 0.08); border-color: rgba(255, 230, 0, 0.4); border-left-color: var(--yellow); }
+  .live-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse-glow 1.4s ease-in-out infinite; }
+  .live-card.long .live-dot { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); }
+  @keyframes pulse-glow { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.85); } }
+  .live-tool { font: 700 13px var(--display); letter-spacing: 0.05em; color: var(--tone, var(--cyan)); text-transform: uppercase; }
+  .live-time { margin-left: auto; font: 600 12px var(--num); color: var(--yellow); background: rgba(0,0,0,0.35); padding: 2px 7px; border-radius: 2px; }
+  .live-desc { font-size: 14px; color: #fff; margin-bottom: 6px; font-weight: 500; }
+  .live-cmd { margin-top: 6px; }
+  .live-cmd code { display: block; padding: 8px 10px; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.08); font: 400 12.5px/1.4 var(--num); color: #7fe7ff; white-space: pre-wrap; word-break: break-all; max-height: 140px; overflow-y: auto; user-select: all; }
+
+  /* mission live execution strip */
+  .mission-live { margin: 10px 0 0; padding: 8px 10px; background: rgba(57, 255, 20, 0.08); border: 1px solid rgba(57, 255, 20, 0.25); cursor: pointer; transition: background .15s; }
+  .mission-live:hover { background: rgba(57, 255, 20, 0.14); }
+  .mission-live-row { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+  .mission-live-row code { font: 500 12px var(--num); color: var(--cyan); background: rgba(0,0,0,0.3); padding: 1px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+  .mission-live-row .time-tag { margin-left: auto; font: 600 11.5px var(--num); color: var(--yellow); }
 
   /* context */
   .ctx-sum { margin: 0 0 10px; font-size: 14px; }
@@ -348,6 +371,7 @@ let graph = null
 let durations = {}
 let lastPush = 0
 let selected = MAIN
+let userSelected = false
 let view = 'map'
 let tab = 'overview'
 const burn = {} // per agent: [{t, v}] its writing speed over time
@@ -1148,7 +1172,9 @@ function drawOrb(a, n, t) {
   // when the name already is its task, the last line says how it is going instead of repeating it
   const named = a.role && a.role.startsWith(a.label.replace(/(…| #\d+)+$/, ''))
   const how = a.status === 'done' ? 'done in ' + dur((a.endedAt || t) - a.startedAt) : a.status === 'error' ? 'failed' : running ? 'working' : a.role
-  ctx.fillText(clip(a.activity || (p.current && running ? p.current : named ? how : a.role), room + 4), x, ly)
+  const toolTimer = a.activeStartedAt ? ` [${dur(t - a.activeStartedAt)}]` : ''
+  const actText = a.activity ? `${a.activity}${toolTimer}` : (p.current && running ? p.current : named ? how : a.role)
+  ctx.fillText(clip(actText, room + 8), x, ly)
 }
 
 function comet(b, color, p, l, tags) {
@@ -1388,11 +1414,23 @@ function renderMission(g, now) {
       const left = u.median - (now - a.startedAt)
       if (!last || left > last.left) last = { a, left }
     }
+    const activeSub = subs.find(a => a.activity || a.activeDetail) || subs[0]
+    const liveActivity = activeSub && (activeSub.activity || activeSub.activeDetail) ? `
+      <div class="mission-live" onclick="select('${esc(activeSub.id)}')">
+        <div class="mission-live-row">
+          <span class="live-dot"></span>
+          <b style="color:${colorOf(activeSub)}">${esc(activeSub.label)}</b>
+          <span>${esc(activeSub.activeTool ? `${activeSub.activeTool}:` : 'doing')}</span>
+          <code>${esc(activeSub.activeDetail || activeSub.activity || 'working')}</code>
+          ${activeSub.activeStartedAt ? `<span class="time-tag">⏱ ${dur(now - activeSub.activeStartedAt)}</span>` : ''}
+        </div>
+      </div>` : ''
     html = `<div class="state"><span class="word">${word}</span><span class="clockv">${mmss(now - M.turnStart)}</span></div>
       ${planLine}
       ${frac !== null ? `<div class="bar${M.plan.total ? '' : ' est'}"><i style="width:${Math.round(Math.min(1, frac) * 100)}%"></i></div>` : ''}
       <p class="line soft">${e && e.text ? e.text : 'Started ' + clock(M.turnStart)}</p>
       ${last ? `<p class="line soft">Waiting longest on <b style="color:${colorOf(last.a)}">${esc(last.a.label)}</b>: ${last.left > 0 ? 'about ' + dur(last.left) + ' left' : 'past its usual time'}</p>` : ''}
+      ${liveActivity}
       ${counts}`
   } else if (M.state === 'done' || M.state === 'failed') {
     const took = M.m.endedAt - M.turnStart
@@ -1482,11 +1520,19 @@ function renderRail() {
   for (const b of $('agents').querySelectorAll('button[data-id]')) {
     const a = g.agents[b.dataset.id]; if (!a) continue
     const p = progressOf(a)
-    const st = a.status === 'running' ? (p.total ? `${p.done}/${p.total}` : a.tps > 0 ? Math.round(a.tps) + ' tok/s' : 'working') : a.id === MAIN && a.status === 'idle' && a.endedAt ? 'waiting for you' : a.status === 'error' ? 'failed' : a.status
+    const activeTimer = a.activeStartedAt ? ` ⏱ ${dur(now - a.activeStartedAt)}` : ''
+    const toolPart = a.activeTool ? `${a.activeTool}${activeTimer}` : ''
+    const st = a.status === 'running' ? (toolPart || (p.total ? `${p.done}/${p.total}` : a.tps > 0 ? Math.round(a.tps) + ' tok/s' : 'working')) : a.id === MAIN && a.status === 'idle' && a.endedAt ? 'waiting for you' : a.status === 'error' ? 'failed' : a.status
     const span = b.lastElementChild
     if (span.textContent !== st) span.textContent = st
     const cls = 'st ' + a.status
     if (span.className !== cls) span.className = cls
+  }
+
+  const subs = g.order.map(id => g.agents[id]).filter(a => a && a.id !== MAIN)
+  const runningSub = subs.find(a => a.status === 'running')
+  if (!userSelected && g.agents[MAIN]?.status !== 'running' && runningSub && selected === MAIN) {
+    selected = runningSub.id
   }
 
   if (!g.agents[selected]) selected = MAIN
@@ -1544,11 +1590,35 @@ function overviewTab(g, a, now) {
       </dl>
       ${a.result ? `<h4>Process output</h4><pre class="quote" style="white-space:pre-wrap;font-family:var(--font-mono,monospace);font-size:12px;max-height:240px;overflow:auto;">${esc(a.result)}</pre>` : ''}`
   }
+
+  const openTool = (a.toolLog || []).slice().reverse().find(tl => tl.end === undefined)
+  const activeElapsed = a.activeStartedAt ? dur(now - a.activeStartedAt) : openTool ? dur(now - openTool.at) : null
+  const isLong = (a.activeStartedAt && now - a.activeStartedAt > 120_000) || (openTool && now - openTool.at > 120_000)
+  const liveBanner = (a.activity || a.activeDetail || openTool) && running ? `
+    <div class="live-card${isLong ? ' long' : ''}">
+      <div class="live-head">
+        <span class="live-dot"></span>
+        <span class="live-tool">${esc(a.activeTool || (openTool && openTool.tool) || 'IN PROGRESS')}</span>
+        ${activeElapsed ? `<span class="live-time">⏱ Running for ${activeElapsed}${isLong ? ' (takes longer than usual)' : ''}</span>` : ''}
+      </div>
+      ${a.activity ? `<div class="live-desc">${esc(a.activity)}</div>` : ''}
+      ${(a.activeDetail || (openTool && openTool.detail)) ? `<div class="live-cmd"><code>$ ${esc(a.activeDetail || openTool.detail)}</code></div>` : ''}
+    </div>` : ''
+
   const todos = (a.todos || []).map(t => `<li class="${t.status}">${esc(t.status === 'in_progress' && t.active ? t.active : t.text)}</li>`).join('')
-  const tools = (a.toolLog || []).slice(-8).reverse().map(tl =>
-    `<li class="${tl.end === undefined ? 'open' : ''}"><span title="${esc(tl.text)}">${esc(tl.text)}</span><span>${tl.end === undefined ? 'running ' + dur(now - tl.at) : dur(tl.end - tl.at)}</span></li>`).join('')
+  const tools = (a.toolLog || []).slice(-12).reverse().map(tl => {
+    const isOpen = tl.end === undefined
+    const durationStr = isOpen ? 'running ' + dur(now - tl.at) : dur(tl.end - tl.at)
+    const detailRow = tl.detail ? `<div class="tool-cmd"><code>${esc(tl.detail)}</code></div>` : ''
+    return `<li class="${isOpen ? 'open' : ''}">
+      <span title="${esc(tl.text)}">${isOpen ? '▶ ' : ''}${esc(tl.text)}</span>
+      <span>${durationStr}</span>
+      ${detailRow}
+    </li>`
+  }).join('')
   const end = a.endedAt
-  return `<p class="now">${nowLine}</p>${eta}
+  return `${liveBanner}
+    <p class="now">${nowLine}</p>${eta}
     ${todos ? `<h4>Its plan, ${p.done} of ${p.total} done</h4><ul class="todos">${todos}</ul>` : ''}
     <h4>Timing and tokens</h4>
     <dl class="facts">
@@ -1678,6 +1748,7 @@ addEventListener('keydown', e => { if (e.key === 'Escape' && openPacket !== null
 // ---------- interaction ----------
 function select(id) {
   if (!id || !graph || !graph.agents[id]) return
+  userSelected = true
   selected = id
   renderRail()
 }

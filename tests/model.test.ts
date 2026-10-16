@@ -200,4 +200,26 @@ describe('model', () => {
     expect(proc?.result).toContain('Evaluation succeeded')
     expect(g.links.at(-1)).toMatchObject({ from: procId, to: M.MAIN, kind: 'report' })
   })
+
+  test('toolStart captures active tool, detail command and started time', async () => {
+    const g = M.emptyGraph(0)
+    expect(M.toolDetail('Bash', { command: 'python script.py --wait', description: 'Wait for run' })).toBe('python script.py --wait')
+    expect(M.toolDetail('Read', { file_path: '/path/to/file.ts' })).toBe('/path/to/file.ts')
+    M.toolStart(g, M.MAIN, 'Bash: Wait for run', 1000, 'Bash', 'python script.py --wait')
+    const main = g.agents[M.MAIN]
+    expect(main?.activeTool).toBe('Bash')
+    expect(main?.activeDetail).toBe('python script.py --wait')
+    expect(main?.activeStartedAt).toBe(1000)
+    expect(main?.toolLog?.[0]).toMatchObject({
+      at: 1000,
+      text: 'Bash: Wait for run',
+      tool: 'Bash',
+      detail: 'python script.py --wait',
+    })
+    M.toolEnd(g, M.MAIN, 2000)
+    expect(main?.activeTool).toBeUndefined()
+    expect(main?.activeDetail).toBeUndefined()
+    expect(main?.activeStartedAt).toBeUndefined()
+    expect(main?.toolLog?.[0]?.end).toBe(2000)
+  })
 })

@@ -23,6 +23,12 @@ export type AgentFlowAgent = {
   tools: number
   /** What it is doing right now (a tool call), if anything. */
   activity?: string
+  /** The tool currently being called (e.g. "Bash", "Read", "Grep"). */
+  activeTool?: string
+  /** Detailed parameter of current tool (e.g. the full shell command, pattern, or file path). */
+  activeDetail?: string
+  /** Timestamp when the current tool call started. */
+  activeStartedAt?: number
   /** Estimated output tokens of the request streaming now. */
   liveOut: number
   /** Output tokens per second of the latest request. */
@@ -48,7 +54,7 @@ export type AgentFlowAgent = {
   isProcess?: boolean
 }
 
-export type AgentFlowToolEntry = { at: number; end?: number; text: string }
+export type AgentFlowToolEntry = { at: number; end?: number; text: string; tool?: string; detail?: string }
 
 export type AgentFlowTodo = {
   id?: string
