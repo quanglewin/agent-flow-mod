@@ -332,15 +332,18 @@ export function renderRaster(g: AgentFlowGraph, now: number, columns: number, ro
   for (const o of Object.values(orbs)) {
     const a = o.a
     const running = a.status === 'running'
-    const mid = running && a.tps > 0 ? `${Math.round(a.tps)}` : a.status === 'done' ? '✓' : a.status === 'error' ? '!' : '·'
+    const mid = a.isProcess
+      ? running ? '⚙' : a.status === 'done' ? '✓' : a.status === 'error' ? '!' : '·'
+      : running && a.tps > 0 ? `${Math.round(a.tps)}` : a.status === 'done' ? '✓' : a.status === 'error' ? '!' : '·'
     labels.push({ col: Math.round(o.x - (mid.length - 1) / 2), row: Math.floor(o.y / 2), text: mid, fg: 0xffffff, bold: true })
     const nameRow = Math.floor((o.y + o.r + 2) / 2) + 1
     const name = clip(a.label, Math.max(6, Math.floor(W / Math.max(1, (bands.find(b => b.includes(a.id)) ?? []).length)) - 2))
     labels.push({ col: Math.round(o.x - name.length / 2), row: nameRow, text: name, fg: rgbInt(o.c), bold: true })
     const out = a.outTok + Math.round(a.liveOut)
     const doing = clip(a.activity ?? a.role, 22)
-    const stat = `${fmt(a.inTok)}/${fmt(out)}`
-    labels.push({ col: Math.round(o.x - stat.length / 2), row: nameRow + 1, text: stat, fg: 0x7fe7ff })
+    const elapsed = a.endedAt ? Math.round((a.endedAt - a.startedAt) / 1000) : Math.round((now - a.startedAt) / 1000)
+    const stat = a.isProcess ? `${elapsed}s` : `${fmt(a.inTok)}/${fmt(out)}`
+    labels.push({ col: Math.round(o.x - stat.length / 2), row: nameRow + 1, text: stat, fg: a.isProcess ? 0x8888aa : 0x7fe7ff })
     labels.push({ col: Math.round(o.x - doing.length / 2), row: nameRow + 2, text: doing, fg: 0x9a9ac0 })
   }
 

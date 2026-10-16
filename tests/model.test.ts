@@ -168,4 +168,36 @@ describe('model', () => {
     expect(M.projectName('/Users/me/work/shop/.claude/worktrees/agent-a91')).toBe('shop (worktree agent-a91)')
     expect(M.projectName('/Users/kat/work/web-app/')).toBe('web-app')
   })
+
+  test('external process calls (python, node, etc.) spawn child process nodes and report back', async () => {
+    const g = M.emptyGraph(0)
+    expect(M.detectProcess('python script.py --arg 1')).toBe('python')
+    expect(M.detectProcess('python3 scripts/model.py')).toBe('python')
+    expect(M.detectProcess('node build.js')).toBe('node')
+    expect(M.detectProcess('ls -la')).toBeUndefined()
+    expect(M.processLabel('python3 /path/to/train.py --epochs 5', 'python')).toBe('python train.py')
+
+    const procId = M.processStart(g, M.MAIN, 'python run_eval.py', 'Run evaluation', 100)
+    expect(procId).toBeDefined()
+    const proc = g.agents[procId!]
+    expect(proc).toMatchObject({
+      parent: M.MAIN,
+      isProcess: true,
+      status: 'running',
+      role: 'Run evaluation',
+    })
+    expect(proc?.label).toContain('python run_eval.py')
+    expect(g.links).toHaveLength(1)
+    expect(g.links[0]).toMatchObject({ from: M.MAIN, to: procId, kind: 'spawn' })
+
+    // Process nodes do not inflate the LLM agent count in totals or session summary
+    expect(M.totals(g).agents).toBe(1) // only main
+    expect(M.summary(g).agents).toBe(0) // no subagents
+
+    M.processEnd(g, procId!, true, 'Evaluation succeeded: 98% accuracy', 500)
+    expect(proc?.status).toBe('done')
+    expect(proc?.endedAt).toBe(500)
+    expect(proc?.result).toContain('Evaluation succeeded')
+    expect(g.links.at(-1)).toMatchObject({ from: procId, to: M.MAIN, kind: 'report' })
+  })
 })

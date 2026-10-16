@@ -132,9 +132,7 @@ function wantContext(id: string): void {
 
 /** Which desktop the session runs on: how a browser is opened, and where its page can live. */
 export type Platform = 'windows' | 'wsl' | 'linux' | 'mac'
-let platformSeen: Platform | null = null
 async function platform($: EngineInterface): Promise<Platform> {
-  if (platformSeen) return platformSeen
   const [os, wsl, desktop, wayland, session] = await Promise.all([
     $.env.get('OS'),
     $.env.get('WSL_DISTRO_NAME'),
@@ -142,8 +140,7 @@ async function platform($: EngineInterface): Promise<Platform> {
     $.env.get('WAYLAND_DISPLAY'),
     $.env.get('XDG_SESSION_TYPE'),
   ])
-  platformSeen = /windows/i.test(os ?? '') ? 'windows' : wsl ? 'wsl' : desktop || wayland || session ? 'linux' : 'mac'
-  return platformSeen
+  return /windows/i.test(os ?? '') ? 'windows' : wsl ? 'wsl' : desktop || wayland || session ? 'linux' : 'mac'
 }
 
 async function homeDir($: EngineInterface): Promise<string> {
@@ -798,6 +795,7 @@ export const register: Register = on => {
     const id = e.agentId ?? M.MAIN
     const args = e as unknown as Record<string, unknown>
     const tool = String(e.tool)
+    let processId: string | undefined
     track((g, now) => {
       M.toolStart(g, id, M.summarizeTool(tool, args), now)
       if (tool === 'TodoWrite') M.setTodos(g, id, args.todos, now)
@@ -808,7 +806,13 @@ export const register: Register = on => {
           active: typeof args.activeForm === 'string' ? args.activeForm : undefined,
         })
       }
-    }, tool === 'TodoWrite' || tool === 'TaskUpdate')
+      // Bash calling an external process: show it as a child node on the map
+      if (tool === 'Bash') {
+        const command = typeof args.command === 'string' ? args.command : ''
+        const description = typeof args.description === 'string' ? args.description : ''
+        processId = M.processStart(g, id, command, description, now)
+      }
+    }, tool === 'TodoWrite' || tool === 'TaskUpdate' || tool === 'Bash')
     let out: Awaited<ReturnType<typeof next>> | undefined
     try {
       out = await next(e)
@@ -821,7 +825,23 @@ export const register: Register = on => {
           const taskId = r?.task && typeof r.task.id === 'string' ? r.task.id : undefined
           M.taskCreate(g, id, taskId, String(args.subject ?? r?.task?.subject ?? ''), typeof args.activeForm === 'string' ? args.activeForm : undefined, now)
         }
-      }, tool === 'TaskCreate')
+        // Complete the process node when the Bash tool finishes
+        if (processId) {
+          let success = true
+          let resultText = ''
+          if (out && typeof out === 'object' && 'result' in out) {
+            const r = out as { result?: unknown }
+            const res = r.result as Record<string, unknown> | undefined
+            if (res) {
+              const exitCode = typeof res.exitCode === 'number' ? res.exitCode : typeof res.exit_code === 'number' ? res.exit_code : undefined
+              success = exitCode === undefined || exitCode === 0
+              resultText = typeof res.stdout === 'string' ? res.stdout : typeof res.output === 'string' ? res.output : ''
+              if (!success && typeof res.stderr === 'string' && res.stderr) resultText = res.stderr
+            }
+          }
+          M.processEnd(g, processId, success, resultText, now)
+        }
+      }, tool === 'TaskCreate' || !!processId)
     }
   }).catch(($, e, next) => next(e))
 
@@ -964,8 +984,11 @@ export const register: Register = on => {
           p => p.elapsed < TRAVEL && ((p.link.from === parent && p.link.to === id) || (p.link.from === id && p.link.to === parent)),
         )
         const hit = landing(id)
-        const glyph = hit ? '✦' : a.status === 'done' ? '◉' : a.status === 'error' ? '⊗' : running ? '●' : '○'
+        const glyph = hit ? '✦' : a.isProcess
+          ? (a.status === 'done' ? '⚙' : a.status === 'error' ? '⚙✗' : '⚙⟳')
+          : a.status === 'done' ? '◉' : a.status === 'error' ? '⊗' : running ? '●' : '○'
         const out = a.outTok + Math.round(a.liveOut)
+        const elapsed = a.endedAt ? Math.round((a.endedAt - a.startedAt) / 1000) : Math.round((now - a.startedAt) / 1000)
         lines.push(
           <Text wrap="truncate">
             {depth > 0 ? ' '.repeat(Math.max(0, (depth - 1) * 3)) : ''}
@@ -976,9 +999,15 @@ export const register: Register = on => {
               {glyph} {a.label}
             </Text>
             {hit ? <Text color={M.neon(g.agents[hit.link.from]?.color ?? 0)} bold> +{M.fmt(hit.link.tokens)}</Text> : ''}
-            <Text color="#7FE7FF"> {M.fmt(a.inTok)}</Text>
-            <Text color="#8888AA">/</Text>
-            <Text color="#FF9BEA">{M.fmt(out)}</Text>
+            {a.isProcess ? (
+              <Text color="#8888AA"> {elapsed}s</Text>
+            ) : (
+              <>
+                <Text color="#7FE7FF"> {M.fmt(a.inTok)}</Text>
+                <Text color="#8888AA">/</Text>
+                <Text color="#FF9BEA">{M.fmt(out)}</Text>
+              </>
+            )}
             {running && a.tps > 0 ? <Text color="#FFE600"> ⚡{a.tps.toFixed(0)}</Text> : ''}
             <Text color="#8888AA"> {a.activity ?? a.role}</Text>
           </Text>,
@@ -1053,6 +1082,7 @@ export const register: Register = on => {
       }
       const out = a.outTok + Math.round(a.liveOut)
       const doing = a.activity ? `▶ ${a.activity}` : a.task ? `“${a.task}”` : a.role
+      const detailElapsed = a.endedAt ? Math.round((a.endedAt - a.startedAt) / 1000) : Math.round((now - a.startedAt) / 1000)
       rows.push(
         <Box flexDirection="row">
           <Text>{' '.repeat(indent)}</Text>
@@ -1066,10 +1096,10 @@ export const register: Register = on => {
           >
             <Box flexDirection="row" justifyContent="space-between">
               <Text color={c} bold wrap="truncate">
-                {a.status === 'running' && tick % 2 === 0 ? '◉' : '○'} {a.label}
+                {a.isProcess ? '⚙' : a.status === 'running' && tick % 2 === 0 ? '◉' : '○'} {a.label}
                 <Text color={c} dimColor>
                   {' '}
-                  · {a.id === M.MAIN ? 'orchestrator' : a.type}
+                  · {a.id === M.MAIN ? 'orchestrator' : a.isProcess ? 'external process' : a.type}
                 </Text>
               </Text>
               <Text color={STATUS_COLOR[a.status]} bold>
@@ -1082,21 +1112,27 @@ export const register: Register = on => {
             <Text color={a.activity ? '#FFFFFF' : '#9A9AC0'} wrap="truncate">
               {doing}
             </Text>
-            <Text wrap="truncate">
-              <Text color="#7FE7FF">in {M.fmt(a.inTok)}</Text>
-              <Text color="#FF9BEA"> out {M.fmt(out)}</Text>
-              {a.status === 'running' && a.tps > 0 ? (
-                <Text color="#FFE600"> ⚡ {a.tps.toFixed(0)} tok/s</Text>
-              ) : a.peakTps > 0 ? (
-                <Text color="#FFE600" dimColor>
-                  {' '}
-                  peak {a.peakTps.toFixed(0)} tok/s
-                </Text>
-              ) : (
-                <Text> </Text>
-              )}
-              <Text color="#6E6E95"> · {a.steps} req · {a.tools} tools</Text>
-            </Text>
+            {a.isProcess ? (
+              <Text color="#8888AA" wrap="truncate">
+                ⏱ {detailElapsed}s {a.result ? `· ${a.result.slice(0, 40)}` : ''}
+              </Text>
+            ) : (
+              <Text wrap="truncate">
+                <Text color="#7FE7FF">in {M.fmt(a.inTok)}</Text>
+                <Text color="#FF9BEA"> out {M.fmt(out)}</Text>
+                {a.status === 'running' && a.tps > 0 ? (
+                  <Text color="#FFE600"> ⚡ {a.tps.toFixed(0)} tok/s</Text>
+                ) : a.peakTps > 0 ? (
+                  <Text color="#FFE600" dimColor>
+                    {' '}
+                    peak {a.peakTps.toFixed(0)} tok/s
+                  </Text>
+                ) : (
+                  <Text> </Text>
+                )}
+                <Text color="#6E6E95"> · {a.steps} req · {a.tools} tools</Text>
+              </Text>
+            )}
           </Box>
         </Box>,
       )

@@ -28,6 +28,33 @@ const RESULT_MAX = 700
 /** A link stays "hot" (animated) this long after it fired. */
 export const HOT_MS = 6000
 
+/** Known external runtimes: when Bash calls one, the map shows a process node. */
+const PROCESS_PATTERNS: [RegExp, string][] = [
+  [/\bpython3?\b/, 'python'],
+  [/\bnode\b/, 'node'],
+  [/\bnpx\b/, 'npx'],
+  [/\bnpm\s+run\b/, 'npm'],
+  [/\byarn\b/, 'yarn'],
+  [/\bpnpm\b/, 'pnpm'],
+  [/\bbun\b/, 'bun'],
+  [/\bdeno\b/, 'deno'],
+  [/\bruby\b/, 'ruby'],
+  [/\bperl\b/, 'perl'],
+  [/\bjava\b/, 'java'],
+  [/\bgo\s+run\b/, 'go'],
+  [/\bcargo\s+run\b/, 'cargo'],
+  [/\brushc\b/, 'rustc'],
+  [/\bdocker\b/, 'docker'],
+  [/\bkubectl\b/, 'kubectl'],
+  [/\bmake\b/, 'make'],
+  [/\bcmake\b/, 'cmake'],
+  [/\bbash\b/, 'bash'],
+  [/\bsh\b/, 'sh'],
+  [/\bpowershell\b|\.ps1\b/, 'powershell'],
+  [/\bcurl\b/, 'curl'],
+  [/\bwget\b/, 'wget'],
+]
+
 /** A packet's flight from sender to receiver, and the flash when it lands. */
 export const PACKET_MS = 1400
 export const IMPACT_MS = 1100
@@ -320,6 +347,91 @@ export function toolEnd(g: AgentFlowGraph, id: string, now: number): void {
   }
 }
 
+// ── External process nodes ──────────────────────────────────────────────────
+
+let processSeq = 0
+
+/**
+ * Detects whether a Bash command invokes a known external runtime.
+ * Returns a short process name ("python", "node", …) or undefined.
+ */
+export function detectProcess(command: string): string | undefined {
+  if (!command) return undefined
+  for (const [re, name] of PROCESS_PATTERNS) {
+    if (re.test(command)) return name
+  }
+  return undefined
+}
+
+/**
+ * Extracts a short label for the process from the Bash command.
+ * e.g. "python train.py --epochs 10" → "python train.py"
+ */
+export function processLabel(command: string, runtime: string): string {
+  // Find the runtime in the command and take the next argument (usually the script name)
+  const parts = command.trim().split(/\s+/)
+  const idx = parts.findIndex(p => PROCESS_PATTERNS.some(([re, name]) => name === runtime && re.test(p)))
+  if (idx >= 0 && idx + 1 < parts.length) {
+    const script = parts[idx + 1] ?? ''
+    // Use basename only
+    const base = script.split(/[\\/]/).pop() ?? script
+    return `${runtime} ${base}`.slice(0, 40)
+  }
+  return runtime
+}
+
+/**
+ * Creates a process child node under the calling agent. Returns the process node's id,
+ * or undefined if no external process was detected.
+ */
+export function processStart(
+  g: AgentFlowGraph,
+  parentId: string,
+  command: string,
+  description: string,
+  now: number,
+): string | undefined {
+  const runtime = detectProcess(command)
+  if (!runtime) return undefined
+
+  processSeq += 1
+  const id = `proc-${parentId}-${processSeq}`
+  const label = processLabel(command, runtime)
+  const parentAgent = agentOf(g, parentId, now)
+  const color = parentAgent.color
+
+  const agent = blankAgent(id, `⚙ ${label}`, 'process', description || command, color, now)
+  agent.parent = parentId
+  agent.status = 'running'
+  agent.isProcess = true
+  agent.task = clip(command, 160)
+
+  g.agents[id] = agent
+  g.order.push(id)
+
+  addLink(g, parentId, id, 'spawn', description || command, now, est(command.length))
+  return id
+}
+
+/** Marks a process node as done or error, and fires a report link back to its parent. */
+export function processEnd(
+  g: AgentFlowGraph,
+  processId: string,
+  success: boolean,
+  resultText: string,
+  now: number,
+): void {
+  const a = g.agents[processId]
+  if (!a) return
+  a.status = success ? 'done' : 'error'
+  a.endedAt = now
+  a.lastActiveAt = now
+  a.activity = undefined
+  a.result = resultText.length > RESULT_MAX ? `${resultText.slice(0, RESULT_MAX - 1)}…` : resultText
+  const parent = a.parent ?? MAIN
+  addLink(g, processId, parent, 'report', resultText || (success ? '(ok)' : '(error)'), now, est(resultText.length))
+}
+
 export type CompleteFacts = { answer: string; reason: string; outTokens?: number }
 
 export function turnComplete(g: AgentFlowGraph, id: string, c: CompleteFacts, now: number): void {
@@ -481,9 +593,11 @@ export function totals(g: AgentFlowGraph): Totals {
   let inTok = 0
   let outTok = 0
   let tps = 0
+  let agentCount = 0
   for (const id of g.order) {
     const a = g.agents[id]
     if (!a) continue
+    if (!a.isProcess) agentCount += 1
     inTok += a.inTok
     outTok += a.outTok + Math.round(a.liveOut)
     if (a.status === 'running') {
@@ -491,7 +605,7 @@ export function totals(g: AgentFlowGraph): Totals {
       tps += a.tps
     }
   }
-  return { agents: g.order.length, running, inTok, outTok, tps }
+  return { agents: agentCount, running, inTok, outTok, tps }
 }
 
 /** One line saying what a tool call does, from its input's usual fields. */
@@ -548,6 +662,7 @@ export function summary(g: AgentFlowGraph): SessionSummary {
   for (const id of g.order) {
     const a = g.agents[id]
     if (!a || id === MAIN) continue
+    if (a.isProcess) continue
     if (a.type === 'agent' && a.inTok === 0 && a.outTok === 0 && a.tools === 0) continue // a loop it learned nothing about
     agents += 1
     if (a.status === 'running') running += 1

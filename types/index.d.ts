@@ -44,6 +44,8 @@ export type AgentFlowAgent = {
   result?: string
   /** Its plan, from TodoWrite or TaskCreate/TaskUpdate: what "done" means for it. */
   todos?: AgentFlowTodo[]
+  /** True when this node represents an external process (Bash), not a real agent. */
+  isProcess?: boolean
 }
 
 export type AgentFlowToolEntry = { at: number; end?: number; text: string }
