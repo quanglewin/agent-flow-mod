@@ -70,6 +70,36 @@ export type AgentFlowChannel = { a: string; b: string; count: number; tokens: nu
 /** Which drawing the pane shows: orbs (one circle per agent) or detailed cards. */
 export type AgentFlowView = 'compact' | 'detail'
 
+export type AdvisorSeverity = 'good' | 'tip' | 'warning'
+
+export type AdvisorItem = {
+  id: string
+  title: string
+  severity: AdvisorSeverity
+  summary: string
+  detail?: string
+  snippet?: string
+  potentialSavings?: string
+}
+
+export type AdvisorReport = {
+  score: number
+  rating: 'Optimal' | 'Good' | 'Moderate Waste' | 'High Token Bleed'
+  costEst: number
+  costSaved: number
+  cacheRate: number
+  items: AdvisorItem[]
+}
+
+export type SessionAdvisorReport = {
+  overallScore: number
+  totalCost: number
+  totalSaved: number
+  totalTokens: number
+  cacheRate: number
+  topSuggestions: AdvisorItem[]
+}
+
 export type AgentFlowLinkKind = 'spawn' | 'report' | 'message'
 
 export type AgentFlowLink = {

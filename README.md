@@ -14,6 +14,7 @@ When Claude starts subagents, it is hard to tell who is doing what, how far alon
 - **"Is it done yet?"** A status box shows RUNNING or DONE, how many planned steps are finished, and a time estimate based on earlier runs. Turn on the bell to get a sound and a notification when it finishes.
 - **Every message.** Click any task or report to read it in full: the exact prompt an agent was given and the answer it sent back.
 - **What each agent sees.** The Context tab lists what is in an agent's context window: its task, its tool calls, and the results.
+- **Prompt & Token Efficiency Advisor.** Real-time efficiency score (0–100), estimated USD cost, and prompt cache savings. Detects token waste patterns (unconstrained search, low cache hits, conversational bloat), suggests 1-click prompt improvements, and generates custom `CLAUDE.md` rules to prevent token bleed.
 - **A timeline.** When each agent started and finished, how fast it wrote, and every tool call.
 - **One tab per session.** Running Claude Code in several windows? Each one gets its own tab.
 
@@ -43,6 +44,7 @@ In Claude Code:
 | `/agent-flow web` | Open the dashboard in your browser |
 | `/agent-flow web demo` | Play a demo, no real agents needed |
 | `/agent-flow web off` | Stop sending this session to the dashboard |
+| `/agent-flow advisor` | Terminal summary of session token efficiency, cost, and prompt tips |
 | `/agent-flow` | Show the map inside Claude Code (terminal or desktop app) |
 | `/agent-flow compact` or `detail` | Circles or cards inside Claude Code |
 | `/agent-flow reset` | Clear the map |
@@ -96,6 +98,7 @@ Change the files, then run `/reload-plugins` in Claude Code.
 - `hooks/register.tsx`: entry point, listens to Claude Code events
 - `hooks/model.ts`: the agent graph
 - `hooks/context.ts`: reads each agent's context
+- `hooks/advisor.ts`: prompt & token efficiency engine
 - `web/index.html`: the browser dashboard
 
 ## License

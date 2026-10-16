@@ -2,6 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
 import type { AgentFlowAgent, AgentFlowGraph, AgentFlowLink, AgentFlowView } from '../types'
+import { sessionAdvisor } from './advisor'
 import { summarize } from './context'
 import type { CtxSnapshot, MessageRow } from './context'
 import * as M from './model'
@@ -662,6 +663,27 @@ export const register: Register = on => {
       }
     }
     if (arg === 'compact' || arg === 'detail') await update($, viewAtom, () => arg)
+    if (arg === 'advisor') {
+      const rep = sessionAdvisor(graph)
+      const lines = [
+        'AGENT//FLOW Token & Prompt Advisor',
+        `Session Efficiency Score: ${rep.overallScore}/100 (${rep.overallScore >= 85 ? 'Optimal' : rep.overallScore >= 70 ? 'Good' : rep.overallScore >= 50 ? 'Moderate Waste' : 'High Token Bleed'})`,
+        `Estimated Cost: $${rep.totalCost.toFixed(2)} · Prompt Cache Saved: $${rep.totalSaved.toFixed(2)} (${Math.round(rep.cacheRate * 100)}% cache hit)`,
+        `Total Tokens: ${M.fmt(rep.totalTokens)} across ${graph.order.length} agent(s)`,
+      ]
+      if (rep.topSuggestions.length > 0) {
+        lines.push('', 'Top Prompt & Token Recommendations:')
+        for (const s of rep.topSuggestions) {
+          lines.push(`• [${s.severity.toUpperCase()}] ${s.title}`)
+          lines.push(`  ${s.summary}`)
+          if (s.snippet) lines.push(`  Tip: ${s.snippet}`)
+          if (s.potentialSavings) lines.push(`  Savings: ${s.potentialSavings}`)
+        }
+      } else {
+        lines.push('', 'All prompts and token caches are operating at optimal efficiency!')
+      }
+      return { text: lines.join('\n') }
+    }
     graph.opened = true
     if (arg === 'status') {
       const opened = await $.ui.open({ id: PANE, title: TITLE })

@@ -279,6 +279,40 @@
   .drawer pre { margin: 0; padding: 12px 14px; background: rgba(0,0,0,.3); border-left: 2px solid var(--magenta);
     font: 400 12.5px/1.6 var(--num); color: #e6e0ff; white-space: pre-wrap; overflow-wrap: anywhere; }
 
+  /* advisor */
+  .advisor-score-card { padding: 14px 16px; background: rgba(255, 255, 255, 0.03); border-left: 3px solid var(--score-color, var(--cyan)); margin-bottom: 14px; }
+  .advisor-score-row { display: flex; align-items: baseline; gap: 10px; }
+  .advisor-score-num { font: 700 28px/1 var(--display); color: var(--score-color, var(--cyan)); }
+  .advisor-score-tag { font: 600 12px var(--num); padding: 2px 8px; border-radius: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .advisor-score-tag.optimal { background: rgba(61, 255, 143, 0.15); color: var(--green); }
+  .advisor-score-tag.good { background: rgba(0, 229, 255, 0.15); color: var(--cyan); }
+  .advisor-score-tag.waste { background: rgba(243, 230, 0, 0.15); color: var(--yellow); }
+  .advisor-score-tag.bleed { background: rgba(255, 51, 85, 0.15); color: var(--red); }
+  .advisor-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 12px 0 16px; }
+  .advisor-cell { background: rgba(0,0,0,0.3); padding: 8px 10px; border: 1px solid rgba(255,255,255,0.05); }
+  .advisor-cell b { display: block; font: 600 15px/1.2 var(--num); color: var(--ink); }
+  .advisor-cell span { font-size: 11.5px; color: var(--muted); }
+  .advisor-card { margin: 0 0 12px; padding: 12px 14px; background: rgba(255,255,255,0.02); border-left: 3px solid var(--muted); }
+  .advisor-card.warning { border-left-color: var(--magenta); background: rgba(255, 46, 136, 0.04); }
+  .advisor-card.tip { border-left-color: var(--yellow); background: rgba(243, 230, 0, 0.04); }
+  .advisor-card.good { border-left-color: var(--green); background: rgba(61, 255, 143, 0.04); }
+  .advisor-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .advisor-tag { font: 600 11px var(--num); padding: 1px 6px; border-radius: 2px; text-transform: uppercase; }
+  .advisor-card.warning .advisor-tag { background: rgba(255,46,136,0.2); color: #ff85be; }
+  .advisor-card.tip .advisor-tag { background: rgba(243,230,0,0.2); color: #fff37a; }
+  .advisor-card.good .advisor-tag { background: rgba(61,255,143,0.2); color: #8affbf; }
+  .advisor-title { font-weight: 600; font-size: 14px; color: var(--ink); }
+  .advisor-desc { font-size: 13.5px; color: #cfc8ef; margin: 4px 0 8px; line-height: 1.45; }
+  .advisor-savings { display: inline-block; font: 500 11.5px var(--num); color: var(--green); background: rgba(61,255,143,0.1); padding: 2px 7px; margin-bottom: 8px; }
+  .advisor-snippet-box { position: relative; margin-top: 6px; }
+  .advisor-snippet-box pre { margin: 0; padding: 8px 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); font: 400 12px/1.45 var(--num); color: #8ee9ff; white-space: pre-wrap; word-break: break-all; }
+  .advisor-copy-btn { position: absolute; right: 6px; top: 6px; --cut: 5px; border: 0; background: var(--deck2); padding: 3px 8px; cursor: pointer; color: var(--cyan); font-size: 11.5px; font-weight: 600; }
+  .advisor-copy-btn:hover { background: var(--cyan); color: var(--void); }
+  .advisor-rules-card { margin-top: 16px; padding: 12px 14px; background: rgba(180, 140, 255, 0.05); border: 1px solid rgba(180, 140, 255, 0.2); }
+  .mission-advisor-badge { margin-top: 10px; padding: 8px 12px; background: rgba(0, 229, 255, 0.06); border: 1px solid rgba(0, 229, 255, 0.2); display: flex; align-items: center; justify-content: space-between; font-size: 13px; cursor: pointer; transition: background .15s; }
+  .mission-advisor-badge:hover { background: rgba(0, 229, 255, 0.14); }
+  .mission-advisor-badge b { color: var(--cyan); font-family: var(--num); }
+
   @media (max-width: 1500px) { .bell .lbl { display: none; } }
   @media (max-width: 900px) {
     body { grid-template-columns: 1fr; grid-template-rows: 62vh auto; overflow: auto; }
@@ -1401,6 +1435,13 @@ function renderMission(g, now) {
     <div><b>${M.failed.length}</b><span>failed</span></div>
     <div><b>${fmt(g.order.reduce((s, id) => s + (g.agents[id] ? g.agents[id].outTok + (g.agents[id].liveOut || 0) : 0), 0))}</b><span>tokens written</span></div>
   </div>`
+  const sc = sessionCost(g)
+  const sRep = sessionAdvisor(g)
+  const advBadge = (g && g.order.length > 0 && sc.total > 0) ? `
+    <div class="mission-advisor-badge chamfer" onclick="tab='advisor';renderRail()">
+      <span>💡 Efficiency: <b>${sRep.overallScore}%</b> · Cost: <b>$${sc.total.toFixed(2)}</b></span>
+      <span style="color:var(--green)">Saved $${sc.saved.toFixed(2)} ➔</span>
+    </div>` : ''
   if (M.state === 'running') {
     const e = etaOf(M.m && M.m.status === 'running' ? M.m : M.running[0], now)
     const planLine = M.plan.total ? `<p class="step"><b>${M.plan.done} of ${M.plan.total} steps done</b>${M.plan.current ? '. Now: ' + esc(M.plan.current) : ''}</p>` : ''
@@ -1431,14 +1472,16 @@ function renderMission(g, now) {
       <p class="line soft">${e && e.text ? e.text : 'Started ' + clock(M.turnStart)}</p>
       ${last ? `<p class="line soft">Waiting longest on <b style="color:${colorOf(last.a)}">${esc(last.a.label)}</b>: ${last.left > 0 ? 'about ' + dur(last.left) + ' left' : 'past its usual time'}</p>` : ''}
       ${liveActivity}
-      ${counts}`
+      ${counts}
+      ${advBadge}`
   } else if (M.state === 'done' || M.state === 'failed') {
     const took = M.m.endedAt - M.turnStart
     html = `<div class="state"><span class="word">${word}</span><span class="clockv">${clock(M.m.endedAt)}</span></div>
       <p class="line">Finished after ${dur(took)}. Claude is waiting for you.</p>
       ${M.failed.length ? `<p class="line soft" style="color:#ffb3c2">${M.failed.length} agent${M.failed.length > 1 ? 's' : ''} failed: ${M.failed.map(a => esc(a.label)).join(', ')}</p>` : ''}
       ${M.plan.total ? `<p class="line soft">${M.plan.done} of ${M.plan.total} planned steps done</p>` : ''}
-      ${counts}`
+      ${counts}
+      ${advBadge}`
   } else {
     html = `<div class="state"><span class="word">${word}</span></div>
       <p class="line soft">Nothing running. Give Claude a task and the run shows up here: how far along it is and when it should be done.</p>`
@@ -1548,13 +1591,13 @@ function renderAgent(g, a, now) {
   const head = `<div class="agent-head"><h3 style="color:${c}">${esc(a.label)}</h3>
     <p>${esc(a.id === MAIN ? 'The orchestrator: talks to you, plans, hands out work' : a.isProcess ? 'External process started by ' + ((a.parent && g.agents[a.parent] && g.agents[a.parent].label) || 'agent') : a.type + (a.parent && a.parent !== MAIN && g.agents[a.parent] ? ', started by ' + g.agents[a.parent].label : ''))}</p></div>
     <div class="tabs" role="tablist" aria-label="About ${esc(a.label)}">
-      ${[['overview', 'Overview'], ['context', 'Context'], ['packets', 'Packets']].map(([k, n]) =>
+      ${[['overview', 'Overview'], ['context', 'Context'], ['packets', 'Packets'], ['advisor', 'Advisor 💡']].map(([k, n]) =>
         `<button type="button" role="tab" class="chamfer" data-tab="${k}" aria-selected="${tab === k}">${n}</button>`).join('')}
     </div>`
   setHtml($('agent-h'), head)
   const bodyEl = $('agent-b')
   bodyEl.style.setProperty('--tone', c)
-  const body = tab === 'context' ? contextTab(g, a, now) : tab === 'packets' ? packetsTab(g, a, now) : overviewTab(g, a, now)
+  const body = tab === 'context' ? contextTab(g, a, now) : tab === 'packets' ? packetsTab(g, a, now) : tab === 'advisor' ? advisorTab(g, a, now) : overviewTab(g, a, now)
   const list = bodyEl.querySelector('.entries')
   const keepScroll = list ? list.scrollTop : null
   const atBottom = list ? list.scrollHeight - list.scrollTop - list.clientHeight < 8 : true
@@ -1684,6 +1727,269 @@ function packetsTab(g, a, now) {
   return `<ul class="wire">${mine.map(l => wireItem(g, l, now)).join('')}</ul>`
 }
 
+// ---------- advisor: prompt & token efficiency engine ----------
+const MODEL_PRICING = {
+  opus: { input: 15.0, cacheRead: 1.5, output: 75.0 },
+  sonnet: { input: 3.0, cacheRead: 0.3, output: 15.0 },
+  haiku: { input: 0.8, cacheRead: 0.08, output: 4.0 },
+}
+
+function modelTier(modelName) {
+  const m = String(modelName || '').toLowerCase()
+  if (m.includes('opus')) return 'opus'
+  if (m.includes('haiku')) return 'haiku'
+  return 'sonnet'
+}
+
+function estimateCost(a) {
+  if (!a) return { actual: 0, saved: 0, withoutCache: 0 }
+  const tier = modelTier(a.model)
+  const rates = MODEL_PRICING[tier] || MODEL_PRICING.sonnet
+  const uncached = Math.max(0, a.inTok - a.cacheTok)
+  const cached = Math.min(a.inTok, a.cacheTok)
+  const out = a.outTok + Math.round(a.liveOut || 0)
+
+  const actual = (uncached * rates.input + cached * rates.cacheRead + out * rates.output) / 1_000_000
+  const withoutCache = (a.inTok * rates.input + out * rates.output) / 1_000_000
+  const saved = Math.max(0, withoutCache - actual)
+  return { actual, saved, withoutCache }
+}
+
+function sessionCost(g) {
+  if (!g) return { total: 0, saved: 0, full: 0 }
+  let total = 0, saved = 0, full = 0
+  for (const id of g.order) {
+    const a = g.agents[id]
+    if (!a) continue
+    const c = estimateCost(a)
+    total += c.actual; saved += c.saved; full += c.withoutCache
+  }
+  return { total, saved, full }
+}
+
+const FILE_EXT_PATTERN = /\b\w+\.(?:ts|tsx|js|jsx|py|go|rs|json|md|ya?ml|html|css|cpp|c|h|sql|proto|sh)\b/i
+const PATH_PATTERN = /(?:[A-Za-z]:)?[\\/][\w.-]+[\\/][\w.-]+/
+const CODE_QUOTE_PATTERN = /`[^`]{2,}`/
+const CONSTRAINT_WORDS = /\b(?:only|strictly|limit|focus\s+on|scope|do\s+not|dont|don't|never|restrict)\b/i
+const VAGUE_WORDS = /\b(?:explore\s+everything|check\s+all|check\s+everything|find\s+and\s+fix|find\s+all|look\s+around|refactor\s+codebase|scan\s+the\s+whole|search\s+all)\b/i
+
+function analyzePrompt(text) {
+  const s = String(text || '')
+  const hasPath = FILE_EXT_PATTERN.test(s) || PATH_PATTERN.test(s) || CODE_QUOTE_PATTERN.test(s)
+  const hasConstraint = CONSTRAINT_WORDS.test(s)
+  const isVague = VAGUE_WORDS.test(s) || (s.split(/\s+/).length < 5 && !hasPath)
+  return { hasPath, hasConstraint, isVague }
+}
+
+function advisorReport(a, g) {
+  const items = []
+  let score = 100
+  const cost = estimateCost(a)
+  const cacheRate = a.inTok > 0 ? a.cacheTok / a.inTok : 1
+
+  const promptText = a.task || a.role || ''
+  if (promptText && !a.isProcess) {
+    const pa = analyzePrompt(promptText)
+    if (!pa.hasPath && !pa.hasConstraint) {
+      score -= 25
+      items.push({
+        id: 'unconstrained-prompt',
+        severity: 'warning',
+        title: 'Prompt lacks file or path constraints',
+        summary: 'Without explicit path boundaries, agents explore broadly using Glob/Grep and read files unnecessarily.',
+        detail: `The task "${clip(promptText, 80)}" does not specify target directories or files.`,
+        snippet: 'Focus ONLY on <target_file_or_dir>. Do NOT read or search outside this directory.',
+        potentialSavings: 'Saves 30% - 60% of exploratory tokens',
+      })
+    } else if (pa.hasPath && pa.hasConstraint) {
+      items.push({
+        id: 'well-scoped-prompt',
+        severity: 'good',
+        title: 'Well-scoped prompt boundaries',
+        summary: 'Prompt targets specific files and declares clear operational constraints.',
+      })
+    }
+
+    if (pa.isVague) {
+      score -= 15
+      items.push({
+        id: 'vague-prompt',
+        severity: 'tip',
+        title: 'Prompt phrasing is open-ended',
+        summary: 'Vague instructions increase back-and-forth turns and conversational token generation.',
+        snippet: 'Identify the root cause in <file>, apply the minimal diff, and verify by running <specific_test>.',
+      })
+    }
+  }
+
+  if (a.inTok >= 200000) {
+    if (cacheRate < 0.5) {
+      score -= 20
+      items.push({
+        id: 'low-cache-rate',
+        severity: 'warning',
+        title: `Low prompt cache rate (${Math.round(cacheRate * 100)}%)`,
+        summary: 'Only a fraction of input tokens hit the cache. You are paying full price (~10x) on input tokens.',
+        detail: `Cached: ${fmt(a.cacheTok)} / Total: ${fmt(a.inTok)}.`,
+        snippet: 'Maintain consistent tool call prefixes and avoid reordering context between turns.',
+        potentialSavings: `Could save ~$${(cost.withoutCache * 0.7).toFixed(2)} with warm cache`,
+      })
+    } else if (cacheRate >= 0.85) {
+      items.push({
+        id: 'high-cache-rate',
+        severity: 'good',
+        title: `Excellent cache hit rate (${Math.round(cacheRate * 100)}%)`,
+        summary: `Saved ~$${cost.saved.toFixed(2)} via Anthropic prompt caching discounts.`,
+      })
+    }
+  }
+
+  if (a.steps >= 12 && a.inTok >= 1500000) {
+    score -= 15
+    items.push({
+      id: 'context-bloat',
+      severity: 'warning',
+      title: `Long conversation turn chain (${a.steps} steps)`,
+      summary: `Each additional turn re-transmits ${fmt(a.ctxTok || 60000)} tokens of context. Long-running single subagents multiply cost.`,
+      snippet: 'Break tasks into single-responsibility subagents: 1 agent to locate, 1 agent to edit & test.',
+      potentialSavings: 'Reduces compounding input token amplification',
+    })
+  }
+
+  const totalOut = a.outTok + Math.round(a.liveOut || 0)
+  if (totalOut > 12000 && a.tools < 3) {
+    score -= 10
+    items.push({
+      id: 'high-output',
+      severity: 'tip',
+      title: `High output token volume (${fmt(totalOut)} written)`,
+      summary: 'Output tokens cost 5x more than input. The agent is producing lengthy explanations.',
+      snippet: 'Be concise. Return only the root cause in 2 sentences and the exact diff. Skip pleasantries.',
+      potentialSavings: 'Cuts output token billing by up to 50%',
+    })
+  }
+
+  score = Math.max(15, Math.min(100, score))
+  const rating = score >= 85 ? 'Optimal' : score >= 70 ? 'Good' : score >= 50 ? 'Moderate Waste' : 'High Token Bleed'
+
+  return {
+    score,
+    rating,
+    costEst: Number(cost.actual.toFixed(3)),
+    costSaved: Number(cost.saved.toFixed(3)),
+    cacheRate: Number(cacheRate.toFixed(2)),
+    items,
+  }
+}
+
+function sessionAdvisor(g) {
+  const cost = sessionCost(g)
+  let totalIn = 0, totalCache = 0, totalOut = 0
+  const allItems = []
+  let totalScore = 0, count = 0
+
+  if (g) {
+    for (const id of g.order) {
+      const a = g.agents[id]
+      if (!a || a.isProcess) continue
+      totalIn += a.inTok
+      totalCache += a.cacheTok
+      totalOut += a.outTok + Math.round(a.liveOut || 0)
+      const rep = advisorReport(a, g)
+      totalScore += rep.score
+      count += 1
+      for (const it of rep.items) {
+        if (it.severity !== 'good' && !allItems.some(x => x.id === it.id)) allItems.push(it)
+      }
+    }
+  }
+
+  const overallScore = count > 0 ? Math.round(totalScore / count) : 100
+  const cacheRate = totalIn > 0 ? totalCache / totalIn : 1
+
+  return {
+    overallScore,
+    totalCost: Number(cost.total.toFixed(2)),
+    totalSaved: Number(cost.saved.toFixed(2)),
+    totalTokens: totalIn + totalOut,
+    cacheRate: Number(cacheRate.toFixed(2)),
+    topSuggestions: allItems.slice(0, 4),
+  }
+}
+
+function advisorTab(g, a, now) {
+  if (!a) return ''
+  const rep = advisorReport(a, g)
+  const cost = estimateCost(a)
+  const tier = modelTier(a.model)
+  const scoreCol = rep.score >= 85 ? 'var(--green)' : rep.score >= 70 ? 'var(--cyan)' : rep.score >= 50 ? 'var(--yellow)' : 'var(--red)'
+  const tagClass = rep.score >= 85 ? 'optimal' : rep.score >= 70 ? 'good' : rep.score >= 50 ? 'waste' : 'bleed'
+
+  const itemsHtml = rep.items.length ? rep.items.map(it => `
+    <div class="advisor-card ${esc(it.severity)}">
+      <div class="advisor-head">
+        <span class="advisor-tag">${esc(it.severity)}</span>
+        <span class="advisor-title">${esc(it.title)}</span>
+      </div>
+      <p class="advisor-desc">${esc(it.summary)}</p>
+      ${it.potentialSavings ? `<span class="advisor-savings">⚡ ${esc(it.potentialSavings)}</span>` : ''}
+      ${it.detail ? `<p class="advisor-desc" style="color:var(--muted)">${esc(it.detail)}</p>` : ''}
+      ${it.snippet ? `
+        <div class="advisor-snippet-box">
+          <pre>${esc(it.snippet)}</pre>
+          <button type="button" class="advisor-copy-btn chamfer" data-copy="${esc(it.snippet)}">Copy</button>
+        </div>` : ''}
+    </div>
+  `).join('') : '<p class="note">No token waste detected. Prompt boundaries and caching are optimal.</p>'
+
+  const claudeMdRules = `# Token Efficiency Rules (generated by AGENT//FLOW)
+1. Always scope prompts with explicit file/directory targets:
+   - Example: Focus ONLY on <path/to/file>. Do not search outside this folder.
+2. Maintain consistent tool prefixes to maximize prompt cache hits (saves ~90% on input tokens).
+3. Request concise diffs and skip conversational preamble:
+   - Example: Output only the diff and 2-sentence rationale.
+4. Delegate independent explorations to small, single-responsibility subagents.
+`
+
+  return `
+    <div class="advisor-score-card" style="--score-color:${scoreCol}">
+      <div class="advisor-score-row">
+        <span class="advisor-score-num">${rep.score}</span>
+        <span style="font-size:18px;color:var(--muted);font-weight:600">/ 100</span>
+        <span class="advisor-score-tag ${tagClass}">${esc(rep.rating)}</span>
+        <span style="margin-left:auto;font:500 12px var(--num);color:var(--muted)">Model: ${esc(tier.toUpperCase())}</span>
+      </div>
+      <div class="bar" style="margin-top:8px"><i style="width:${rep.score}%;background:${scoreCol}"></i></div>
+    </div>
+
+    <div class="advisor-grid">
+      <div class="advisor-cell">
+        <b>$${cost.actual.toFixed(3)}</b>
+        <span>Est. Cost</span>
+      </div>
+      <div class="advisor-cell">
+        <b style="color:var(--green)">$${cost.saved.toFixed(3)}</b>
+        <span>Saved (${Math.round((rep.cacheRate || 0) * 100)}% cache)</span>
+      </div>
+      <div class="advisor-cell">
+        <b style="color:var(--muted)">$${cost.withoutCache.toFixed(3)}</b>
+        <span>Without Cache</span>
+      </div>
+    </div>
+
+    <h4>Prompt & Token Advice</h4>
+    ${itemsHtml}
+
+    <div class="advisor-rules-card">
+      <div class="advisor-head">
+        <span class="advisor-title" style="color:var(--violet)">Recommended CLAUDE.md Rules</span>
+        <button type="button" class="advisor-copy-btn chamfer" style="margin-left:auto;position:static" data-copy="${esc(claudeMdRules)}">Copy Rules</button>
+      </div>
+      <p class="advisor-desc">Paste these rules into your project's <code>CLAUDE.md</code> to enforce token-saving habits across all subagents.</p>
+    </div>
+  `
+}
+
 function wireItem(g, l, now) {
   const f = g.agents[l.from], to = g.agents[l.to]
   const fc = f ? colorOf(f) : '#fff', tc = to ? colorOf(to) : '#fff'
@@ -1772,6 +2078,12 @@ onPick($('agent'), target => {
   if (t) { tab = t.dataset.tab; try { localStorage.setItem('agent-flow-tab', tab) } catch {}; renderRail(); return true }
   const l = target.closest('button[data-link]')
   if (l) { openDrawer(Number(l.dataset.link)); return true }
+  const cp = target.closest('[data-copy]')
+  if (cp) {
+    const text = cp.dataset.copy || cp.parentElement?.querySelector('pre')?.textContent || ''
+    try { navigator.clipboard.writeText(text); cp.textContent = 'Copied!'; setTimeout(() => { cp.textContent = cp.dataset.copy.includes('CLAUDE.md') ? 'Copy Rules' : 'Copy' }, 2000) } catch {}
+    return true
+  }
   return false
 })
 $('agent').addEventListener('toggle', e => {
@@ -1791,7 +2103,7 @@ document.querySelector('.views').addEventListener('click', e => {
 try {
   const v = localStorage.getItem('agent-flow-view')
   if (v === 'timeline' || v === 'map') { view = v; for (const x of document.querySelectorAll('.views button')) x.setAttribute('aria-pressed', String(x.dataset.view === v)) }
-  const tb = localStorage.getItem('agent-flow-tab'); if (tb === 'overview' || tb === 'context' || tb === 'packets') tab = tb
+  const tb = localStorage.getItem('agent-flow-tab'); if (tb === 'overview' || tb === 'context' || tb === 'packets' || tb === 'advisor') tab = tb
   if (localStorage.getItem('agent-flow-bell')) { bellOn = true; $('bell').setAttribute('aria-pressed', 'true') }
   if (localStorage.getItem('agent-flow-done')) showDone = true
 } catch {}
