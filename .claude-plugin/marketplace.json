@@ -1,0 +1,5 @@
+{
+  "name": "claude-mods",
+  "owner": { "name": "Kat McAllister" },
+  "plugins": [{ "name": "agent-flow", "source": "./" }]
+}

@@ -1,0 +1,1970 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AGENT//FLOW</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #0a0614;
+    --deck: #110a21;
+    --deck2: #170e2c;
+    --rule: #2a1f4a;
+    --ink: #ede8ff;
+    --muted: #9188bc;
+    --faint: #5b5285;
+    --yellow: #f3e600;
+    --cyan: #00e5ff;
+    --magenta: #ff2e88;
+    --red: #ff3355;
+    --green: #3dff8f;
+    --violet: #b48cff;
+    --display: "Chakra Petch", ui-sans-serif, system-ui, sans-serif;
+    --num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --rail: 404px;
+    --cut: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--void); color: var(--ink); }
+  body { font: 15px/1.45 var(--display); display: grid; grid-template-columns: 1fr var(--rail); overflow: hidden; }
+  body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 50;
+    background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.025) 0 1px, transparent 1px 3px); }
+  button { font: inherit; color: inherit; }
+  #stage, .stabs, .views, .tabs, .agents, .mapbar { -webkit-user-select: none; user-select: none; }
+  canvas { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  .switching { position: absolute; inset: 0; display: none; place-items: center; pointer-events: none; z-index: 3; }
+  .switching.show { display: grid; }
+  .switching div { background: rgba(10, 6, 20, .88); border-left: 3px solid var(--cyan); padding: 12px 18px; max-width: 46ch; }
+  .switching b { display: block; font-size: 16px; }
+  .switching span { color: var(--muted); font-size: 13.5px; }
+  :focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+  .chamfer { clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut))); }
+
+  /* ---------- stage ---------- */
+  #stage { position: relative; min-width: 0; min-height: 0; }
+  canvas { display: block; width: 100%; height: 100%; }
+  canvas.pointing { cursor: pointer; }
+  .hud { position: absolute; left: 24px; right: 24px; top: 18px; display: flex; flex-direction: column; gap: 12px; pointer-events: none; }
+  .top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; pointer-events: none; }
+  .top > * { pointer-events: auto; }
+  .brand { margin: 0; font: 700 24px/1 var(--display); letter-spacing: 0.08em; color: var(--ink); pointer-events: none; white-space: nowrap; }
+  .brand span { color: var(--magenta); }
+  .stabs { display: flex; gap: 3px; overflow-x: auto; pointer-events: auto; scrollbar-width: none; }
+  .stabs:empty { display: none; }
+  .stab { --cut: 8px; --st: var(--faint); flex: none; display: grid; grid-template-columns: 9px auto; grid-template-rows: auto auto; column-gap: 9px; align-items: center;
+    border: 0; padding: 6px 14px 6px 11px; background: var(--deck2); color: var(--muted); cursor: pointer; text-align: left;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%); border-bottom: 2px solid transparent; }
+  .stab i { grid-row: 1 / 3; width: 9px; height: 9px; transform: rotate(45deg); background: var(--st); }
+  .stab .nm { font-weight: 600; font-size: 14px; color: var(--ink); max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stab .sub { font: 500 11.5px var(--num); color: var(--muted); white-space: nowrap; }
+  .stab.running { --st: var(--yellow); }
+  .stab.running i { box-shadow: 0 0 10px var(--yellow); }
+  .stab.done { --st: var(--cyan); }
+  .stab.failed { --st: var(--red); }
+  .stab.closed { opacity: .5; }
+  .stab[aria-selected="true"] { background: #23163e; border-bottom-color: var(--cyan); }
+  .stab.ping { animation: ping 1.2s ease-in-out infinite; }
+  .stab.ping .sub { color: var(--ink); }
+  @keyframes ping { 50% { background: rgba(0, 229, 255, .22); } }
+  .toast { position: absolute; left: 50%; bottom: 22px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none; z-index: 6;
+    background: var(--deck2); border-left: 3px solid var(--cyan); padding: 10px 16px; font-weight: 600; transition: opacity .25s, transform .25s; }
+  .toast.bad { border-left-color: var(--red); }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .conn { font: 500 12px/1 var(--num); color: var(--muted); display: inline-flex; align-items: center; gap: 8px; pointer-events: none; white-space: nowrap; }
+  .conn i { width: 8px; height: 8px; background: var(--faint); display: inline-block; transform: rotate(45deg); }
+  .conn.live i { background: var(--green); box-shadow: 0 0 10px var(--green); }
+  .conn.demo i { background: var(--yellow); box-shadow: 0 0 10px var(--yellow); }
+  .views { margin-left: auto; display: inline-flex; gap: 2px; }
+  .views button { --cut: 7px; border: 0; padding: 7px 16px; cursor: pointer; background: var(--deck2); color: var(--muted); font-weight: 600; }
+  .views button[aria-pressed="true"] { background: var(--cyan); color: var(--void); }
+  .bell { --cut: 7px; border: 0; padding: 7px 12px; cursor: pointer; background: var(--deck2); color: var(--muted); font-weight: 600; white-space: nowrap; }
+  .bell[aria-pressed="true"] { background: var(--yellow); color: var(--void); }
+
+  .attention { display: flex; flex-wrap: wrap; gap: 8px; pointer-events: auto; }
+  .attention:empty { display: none; }
+  .attention button { --cut: 8px; border: 0; padding: 6px 14px 6px 12px; cursor: pointer; display: inline-flex; gap: 9px; align-items: center; font-size: 13px; font-weight: 500; }
+  .attention button i { width: 8px; height: 8px; transform: rotate(45deg); }
+  .attention .error { background: rgba(255, 51, 85, .16); color: #ffc4cf; }
+  .attention .error i { background: var(--red); box-shadow: 0 0 8px var(--red); }
+  .attention .quiet { background: rgba(243, 230, 0, .12); color: #fff6a8; }
+  .attention .quiet i { background: var(--yellow); }
+
+  .mapbar { position: absolute; left: 24px; bottom: 20px; display: flex; gap: 6px; z-index: 4; }
+  canvas { touch-action: pan-y; }
+  canvas.dragging { cursor: grabbing; }
+  .donechip { --cut: 8px; border: 0; background: var(--deck2); color: var(--muted);
+    padding: 7px 14px; cursor: pointer; font-size: 13px; font-weight: 600; z-index: 4; }
+  .donechip:hover { color: var(--cyan); }
+  .agents button.more { display: block; color: var(--cyan); font-size: 13px; font-weight: 600; padding: 8px; }
+  .tip { position: absolute; pointer-events: none; max-width: 340px; padding: 8px 11px; background: var(--deck2); border-left: 2px solid var(--cyan);
+    font-size: 13px; display: none; box-shadow: 0 10px 30px rgba(0,0,0,.5); z-index: 5; }
+  .tip b { display: block; margin-bottom: 2px; font-weight: 600; }
+  .tip span { font: 500 12px var(--num); color: var(--muted); }
+
+  /* the empty message covers the stage but must never take clicks meant for the tabs above it */
+  .empty { position: absolute; inset: 0; display: none; place-items: center; text-align: center; padding: 24px; pointer-events: none; }
+  .empty a { pointer-events: auto; }
+  .hud { z-index: 5; }
+  .empty.show { display: grid; }
+  .empty div { max-width: 46ch; }
+  .empty p { margin: 0 0 10px; color: var(--muted); }
+  .empty p:first-child { color: var(--ink); font-size: 18px; font-weight: 600; }
+  .empty code { font: 500 13px var(--num); color: var(--cyan); background: rgba(0, 229, 255, .08); padding: 2px 6px; }
+  .empty a { color: var(--cyan); }
+
+  /* ---------- rail ---------- */
+  aside { border-left: 1px solid var(--rule); background: var(--deck); overflow-y: auto; min-height: 0; }
+  aside > section { padding: 18px 20px; border-bottom: 1px solid var(--rule); }
+  aside h2 { margin: 0 0 12px; font: 600 14px/1 var(--display); color: var(--muted); }
+
+  /* the mission plate: is it done, how far, how long */
+  .mission { padding: 18px 18px 16px; }
+  .plate { --cut: 16px; --tone: var(--faint); background: var(--tone); padding: 1px; }
+  .plate > div { --cut: 15px; background: linear-gradient(160deg, var(--deck2), var(--deck)); padding: 14px 16px 15px; }
+  .plate.running { --tone: var(--yellow); }
+  .plate.done { --tone: var(--cyan); }
+  .plate.failed { --tone: var(--red); }
+  .plate .state { display: flex; align-items: baseline; gap: 12px; }
+  .plate .word { font: 700 34px/1 var(--display); letter-spacing: 0.06em; color: var(--tone); }
+  .plate .clockv { margin-left: auto; font: 600 22px/1 var(--num); font-variant-numeric: tabular-nums; color: var(--ink); }
+  .plate .line { margin: 10px 0 0; font-size: 15px; }
+  .plate .line.soft { color: var(--muted); font-size: 13.5px; margin-top: 6px; }
+  .plate .step { margin: 10px 0 0; color: var(--ink); font-size: 14px; }
+  .plate .step b { font-weight: 600; color: var(--tone); }
+  .bar { position: relative; height: 10px; margin-top: 12px; background: rgba(255,255,255,.06); overflow: hidden; }
+  .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--tone); }
+  .plate.running .bar i { background: repeating-linear-gradient(-45deg, var(--yellow) 0 8px, #b8ad00 8px 16px); background-size: 22.6px 22.6px; animation: hazard 1.2s linear infinite; }
+  .bar.est i { opacity: .55; }
+  @keyframes hazard { to { background-position: 22.6px 0; } }
+  .plate.flash .word { animation: glitch .9s steps(2, end) 1; }
+  @keyframes glitch {
+    0% { text-shadow: 3px 0 var(--magenta), -3px 0 var(--cyan); transform: translateX(2px); }
+    25% { text-shadow: -4px 0 var(--magenta), 4px 0 var(--cyan); transform: translateX(-3px); clip-path: inset(10% 0 40% 0); }
+    50% { text-shadow: 2px 0 var(--magenta), -2px 0 var(--cyan); transform: none; clip-path: inset(50% 0 5% 0); }
+    100% { text-shadow: none; transform: none; clip-path: none; }
+  }
+  .counts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 14px; }
+  .counts div { background: rgba(255,255,255,.03); padding: 7px 9px; }
+  .counts b { display: block; font: 600 17px/1.1 var(--num); font-variant-numeric: tabular-nums; }
+  .counts span { font-size: 12px; color: var(--muted); }
+
+  .agents { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .agents button { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 12px 1fr auto; gap: 10px;
+    align-items: center; padding: 7px 8px; cursor: pointer; border-left: 2px solid transparent; }
+  .agents button:hover { background: rgba(255, 255, 255, .04); }
+  .agents button[aria-pressed="true"] { background: rgba(0, 229, 255, .07); border-left-color: var(--cyan); }
+  .agents button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 1px; }
+  .dot { width: 9px; height: 9px; transform: rotate(45deg); }
+  .agents .who { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .agents .who small { font-weight: 400; color: var(--muted); margin-left: 6px; }
+  .agents .st { font: 500 12px var(--num); color: var(--muted); }
+  .agents .st.running { color: var(--green); }
+  .agents .st.error { color: var(--red); }
+
+  /* the selected agent */
+  .agent-head h3 { margin: 0; font: 700 22px/1.15 var(--display); }
+  .agent-head p { margin: 2px 0 12px; color: var(--muted); font-size: 13.5px; }
+  .tabs { display: flex; gap: 2px; margin: 0 0 14px; }
+  .tabs button { --cut: 7px; flex: 1; border: 0; padding: 7px 8px; cursor: pointer; background: var(--deck2); color: var(--muted); font-weight: 600; font-size: 14px; }
+  .tabs button[aria-selected="true"] { background: var(--magenta); color: #1a0010; }
+  .now { margin: 0 0 14px; padding: 9px 12px; background: rgba(255, 255, 255, .04); border-left: 2px solid var(--tone, var(--cyan)); font-size: 14px; }
+  .eta { margin: 0 0 16px; }
+  .eta .bar { margin-top: 6px; }
+  .eta p { margin: 0; font-size: 13.5px; color: var(--muted); }
+  .eta p b { color: var(--ink); font-weight: 600; }
+  dl.facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; }
+  dl.facts dt { color: var(--muted); font-size: 13px; }
+  dl.facts dd { margin: 0; font: 500 13px var(--num); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  dl.facts dd.text { font: 400 14px/1.45 var(--display); color: #d8d2f5; }
+  dl.facts dd .soft { color: var(--muted); }
+  h4 { margin: 18px 0 8px; font: 600 14px var(--display); color: var(--muted); }
+  .todos { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
+  .todos li { display: grid; grid-template-columns: 16px 1fr; gap: 8px; color: #cfc8ef; }
+  .todos li::before { content: "◇"; color: var(--faint); }
+  .todos li.completed { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(145,136,188,.5); }
+  .todos li.completed::before { content: "◆"; color: var(--cyan); }
+  .todos li.in_progress { color: var(--ink); }
+  .todos li.in_progress::before { content: "▶"; color: var(--yellow); }
+  .tools { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+  .tools li { display: grid; grid-template-columns: 1fr auto; gap: 10px; font-size: 13.5px; }
+  .tools li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #ddd6ff; }
+  .tools li span:last-child { font: 500 12px var(--num); color: var(--muted); }
+  .tools li.open span:last-child { color: var(--green); }
+  .quote { margin: 0; padding: 10px 12px; border-left: 2px solid var(--tone, var(--cyan)); background: rgba(255, 255, 255, .03);
+    font-size: 14px; line-height: 1.5; color: #e0daf9; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+  /* context */
+  .ctx-sum { margin: 0 0 10px; font-size: 14px; }
+  .ctx-sum b { font: 600 15px var(--num); }
+  .stack { display: flex; height: 16px; gap: 2px; margin: 0 0 10px; }
+  .stack i { display: block; min-width: 3px; }
+  .legend { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 4px; font-size: 13.5px; }
+  .legend li { display: grid; grid-template-columns: 10px 1fr auto; gap: 9px; align-items: center; }
+  .legend li i { width: 10px; height: 10px; }
+  .legend li span:last-child { font: 500 12.5px var(--num); color: var(--muted); }
+  .legend li.est span:nth-child(2)::after { content: " (estimate)"; color: var(--faint); }
+  .note { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+  .entries { list-style: none; margin: 0; padding: 0; max-height: 460px; overflow-y: auto; border-top: 1px solid var(--rule); }
+  .entries li { border-bottom: 1px solid rgba(42, 31, 74, .7); }
+  .entries summary { display: grid; grid-template-columns: 8px 1fr auto; gap: 9px; align-items: center; padding: 7px 4px; cursor: pointer; list-style: none; font-size: 13.5px; }
+  .entries summary::-webkit-details-marker { display: none; }
+  .entries summary i { width: 8px; height: 8px; transform: rotate(45deg); }
+  .entries summary span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .entries summary span:last-child { font: 500 12px var(--num); color: var(--muted); }
+  .entries pre { margin: 0 0 8px 21px; padding: 8px 10px; background: rgba(0,0,0,.28); font: 400 12px/1.5 var(--num); color: #cfc8ef;
+    white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow-y: auto; }
+  .skipped { padding: 7px 4px; font-size: 13px; color: var(--faint); }
+
+  /* packet lists */
+  .wire { list-style: none; margin: 0; padding: 0; }
+  .wire li { border-top: 1px solid rgba(42, 31, 74, .7); }
+  .wire li:first-child { border-top: 0; }
+  .wire button { all: unset; box-sizing: border-box; width: 100%; display: block; padding: 9px 4px; cursor: pointer; }
+  .wire button:hover { background: rgba(255,255,255,.03); }
+  .wire button:focus-visible { outline: 2px solid var(--cyan); }
+  .wire .route { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; font-weight: 600; font-size: 14px; }
+  .wire .route > span { white-space: nowrap; }
+  .wire .route .arrow { color: var(--faint); }
+  .wire .meta { margin-left: auto; font: 500 12px var(--num); color: var(--muted); white-space: nowrap; }
+  .kind { font: 500 11.5px var(--display); padding: 1px 7px; background: rgba(255, 255, 255, .07); color: #cfc8ef; white-space: nowrap; }
+  .kind.spawn { background: rgba(0, 229, 255, .13); color: #9ff4ff; }
+  .kind.report { background: rgba(61, 255, 143, .12); color: #a8ffcb; }
+  .kind.message { background: rgba(255, 46, 136, .15); color: #ffb3d4; }
+  .wire p { margin: 4px 0 0; color: #bdb5e2; font-size: 13.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .wire li.fresh { animation: fresh 1.6s ease-out; }
+  @keyframes fresh { from { background: rgba(255, 46, 136, .12); } to { background: transparent; } }
+  .wire-empty { color: var(--muted); margin: 0; font-size: 14px; }
+
+  /* packet inspector */
+  .drawer { position: fixed; top: 0; bottom: 0; right: var(--rail); width: min(560px, calc(100vw - var(--rail))); z-index: 20; display: none;
+    background: var(--deck2); border-left: 2px solid var(--magenta); box-shadow: -20px 0 60px rgba(0,0,0,.55); flex-direction: column; }
+  .drawer.open { display: flex; }
+  .drawer header { padding: 18px 20px 14px; border-bottom: 1px solid var(--rule); }
+  .drawer header .row { display: flex; align-items: center; gap: 10px; }
+  .drawer header h2 { margin: 0; font: 700 20px/1.2 var(--display); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .drawer header h2 .arrow { color: var(--faint); }
+  .drawer .close { --cut: 7px; margin-left: auto; border: 0; background: var(--deck); padding: 6px 12px; cursor: pointer; color: var(--muted); font-weight: 600; }
+  .drawer .sub { margin: 8px 0 0; font: 500 12.5px var(--num); color: var(--muted); }
+  .drawer .scroll { overflow-y: auto; padding: 16px 20px 24px; }
+  .drawer dl.facts { margin-bottom: 18px; }
+  .drawer .bodyhead { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; }
+  .drawer .bodyhead h3 { margin: 0; font: 600 14px var(--display); color: var(--muted); }
+  .drawer .copy { --cut: 6px; margin-left: auto; border: 0; background: var(--deck); padding: 5px 10px; cursor: pointer; color: var(--cyan); font-size: 13px; font-weight: 600; }
+  .drawer pre { margin: 0; padding: 12px 14px; background: rgba(0,0,0,.3); border-left: 2px solid var(--magenta);
+    font: 400 12.5px/1.6 var(--num); color: #e6e0ff; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+  @media (max-width: 1500px) { .bell .lbl { display: none; } }
+  @media (max-width: 900px) {
+    body { grid-template-columns: 1fr; grid-template-rows: 62vh auto; overflow: auto; }
+    aside { border-left: 0; border-top: 1px solid var(--rule); }
+    .brand { font-size: 17px; }
+    .conn span { display: none; }
+    .hud { left: 14px; right: 14px; top: 14px; }
+    .top { gap: 8px 10px; }
+    .views button { padding: 6px 11px; }
+    .bell .lbl { display: none; }
+    .drawer { right: 0; width: 100vw; }
+    .counts { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .wire li.fresh, .plate.flash .word, .plate.running .bar i { animation: none; }
+  }
+</style>
+</head>
+<body>
+<main id="stage">
+  <canvas id="c" aria-label="The session's agents: who handed work to whom, and what each is doing"></canvas>
+  <div class="hud" id="hud">
+  <div class="top">
+    <h1 class="brand">AGENT<span>//</span>FLOW</h1>
+    <span class="conn" id="conn" title="Whether Claude Code is sending updates to this page"><i></i><span>Waiting</span></span>
+    <div class="views" role="group" aria-label="View">
+      <button type="button" class="chamfer" data-view="map" aria-pressed="true">Map</button>
+      <button type="button" class="chamfer" data-view="timeline" aria-pressed="false">Timeline</button>
+    </div>
+    <button type="button" class="bell chamfer" id="bell" aria-pressed="false" title="Play a sound and notify when the work is done">◈ <span class="lbl">Notify when done</span></button>
+  </div>
+  <div class="stabs" id="tabs" role="tablist" aria-label="Claude Code sessions"></div>
+  <div class="attention" id="attention" aria-live="polite"></div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="tip" id="tip" role="tooltip"></div>
+  <div class="switching" id="switching" aria-live="polite"><div><b id="sw-title"></b><span id="sw-text"></span></div></div>
+  <div class="mapbar"><button type="button" class="donechip chamfer" id="donechip" hidden></button><button type="button" class="donechip chamfer" id="resetpins" hidden>Reset layout</button></div>
+  <div class="empty" id="empty"><div>
+    <p>No agents to show yet</p>
+    <p>In Claude Code, run <code>/agent-flow web</code>. This map fills in as agents start, hand off work and report back.</p>
+    <p>Want to see it move first? <a href="?demo">Play the demo run</a>.</p>
+  </div></div>
+</main>
+<aside aria-label="Session details">
+  <section class="mission" aria-live="polite"><div class="plate chamfer" id="plate"><div class="chamfer" id="plate-in"></div></div></section>
+  <section aria-labelledby="h-agents">
+    <h2 id="h-agents">Agents</h2>
+    <ul class="agents" id="agents"></ul>
+  </section>
+  <section id="agent"></section>
+  <section aria-labelledby="h-wire">
+    <h2 id="h-wire">Every hand-off</h2>
+    <ul class="wire" id="wire"></ul>
+  </section>
+</aside>
+<div class="drawer" id="drawer" role="dialog" aria-modal="false" aria-labelledby="d-title"></div>
+
+<script>
+'use strict'
+const NEON = ['#00F0FF', '#FF2BD6', '#39FF14', '#FFE600', '#B026FF', '#FF8A00', '#FF3864', '#00FFA3']
+const MAIN = 'main'
+const MAIN_TURN = '(main turn)'
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches
+const DEMO = new URLSearchParams(location.search).has('demo') || window.__AF_DEMO === true
+/** The session whose tab is open: its data is read from s/<id>/. */
+let active = null
+const QUIET_MS = 45000
+const IMPACT_MS = 1100
+const pageStart = Date.now()
+const KIND_COLOR = { prompt: '#F3E600', user: '#00E5FF', reply: '#FF2E88', call: '#B48CFF', result: '#3DFF8F', error: '#FF3355' }
+const KIND_NAME = { prompt: 'The task it was handed', user: 'Your messages', reply: 'What it wrote', call: 'Its tool calls', result: 'Tool results', error: 'Tool errors' }
+const PACKET_NAME = { spawn: 'Task handed over', report: 'Report back', message: 'Direct message' }
+
+const $ = id => document.getElementById(id)
+const fmt = n => n < 1000 ? String(Math.round(n)) : n < 1e6 ? (n / 1000).toFixed(n < 1e4 ? 1 : 0).replace(/\.0$/, '') + 'k' : (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M'
+const clip = (s, n) => { s = String(s || '').replace(/\s+/g, ' ').trim(); return s.length <= n ? s : s.slice(0, Math.max(1, n - 1)) + '…' }
+const colorOf = a => a.status === 'error' ? '#FF3864' : NEON[((a.color % NEON.length) + NEON.length) % NEON.length]
+const rgb = hex => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)]
+const rgba = (hex, a) => { const [r, g, b] = rgb(hex); return `rgba(${r},${g},${b},${a})` }
+const dur = ms => { const s = Math.max(0, Math.round(ms / 1000)); if (s < 60) return s + 's'; const m = Math.floor(s / 60); if (m < 60) return m + 'm ' + String(s % 60).padStart(2, '0') + 's'; return Math.floor(m / 60) + 'h ' + String(m % 60).padStart(2, '0') + 'm' }
+const clock = ms => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+const ago = ms => ms < 1500 ? 'just now' : dur(ms) + ' ago'
+const mmss = ms => { const s = Math.max(0, Math.floor(ms / 1000)); const m = Math.floor(s / 60); return (m >= 60 ? Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0') : m) + ':' + String(s % 60).padStart(2, '0') }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]) }
+const setHtml = (el, html) => { if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; return true } return false }
+
+// ---------- data ----------
+let graph = null
+let durations = {}
+let lastPush = 0
+let selected = MAIN
+let view = 'map'
+let tab = 'overview'
+const burn = {} // per agent: [{t, v}] its writing speed over time
+const packets = new Map() // link id → full packet
+let contexts = { agents: {}, main: null }
+let packetsRev = -1, ctxRev = -1
+
+window.__AF_PUSH = payload => {
+  if (!payload || !payload.graph || (payload.sid && payload.sid !== active)) return
+  graph = payload.graph
+  durations = payload.history || durations
+  lastPush = Date.now()
+  $('switching').classList.remove('show')
+  const t = payload.now || lastPush
+  for (const id of graph.order) {
+    const a = graph.agents[id]; if (!a) continue
+    const h = burn[id] || (burn[id] = [])
+    const v = a.status === 'running' ? (a.tps || 0) : 0
+    if (!h.length || t - h[h.length - 1].t >= 250) h.push({ t, v })
+    if (h.length > 1200) h.splice(0, h.length - 1200)
+  }
+  const rev = payload.rev || {}
+  if (!DEMO && rev.packets !== undefined && rev.packets !== packetsRev) load(base() + 'packets.js')
+  if (!DEMO && rev.ctx !== undefined && rev.ctx !== ctxRev) load(base() + 'context.js')
+  railSoon()
+}
+/** Pushes come ten times a second; the rail is text to read, so it redraws at most four. */
+let railTimer = null, railAt = 0
+function railSoon() {
+  if (railTimer) return
+  const wait = Math.max(0, 250 - (Date.now() - railAt))
+  railTimer = setTimeout(() => { railTimer = null; railAt = Date.now(); renderRail() }, wait)
+}
+window.__AF_PACKETS = data => {
+  if (!data || (data.sid && data.sid !== active)) return
+  packetsRev = data.rev
+  for (const p of data.items || []) packets.set(p.id, p)
+  railSoon()
+  if (openPacket !== null) renderDrawer()
+}
+window.__AF_CTX = data => {
+  if (!data || (data.sid && data.sid !== active)) return
+  ctxRev = data.rev
+  contexts = { agents: data.agents || {}, main: data.main || null }
+  railSoon()
+}
+
+// ---------- sessions: one tab per Claude Code session ----------
+// sessions.js lists them (each session adds itself); s/<id>/meta.js says what each is doing, written by that session alone.
+let sessionList = []
+const metas = {}
+const seenState = {} // what each tab last showed, to notice a background session finishing
+const pinged = new Set() // tabs that finished while you were on another one
+const base = () => (active ? 's/' + encodeURIComponent(active) + '/' : '')
+const LIVE_MS = 15000
+
+window.__AF_SESSIONS = data => {
+  if (!data || !Array.isArray(data.sessions)) return
+  sessionList = data.sessions.filter(x => x && typeof x.id === 'string')
+  if (!active || !sessionList.some(x => x.id === active)) {
+    const want = (location.hash.match(/s=([^&]+)/) || [])[1]
+    const pick = sessionList.find(x => x.id === decodeURIComponent(want || '')) || sessionList.slice().sort((x, y) => (y.lastSeen || 0) - (x.lastSeen || 0))[0]
+    if (pick && pick.id !== active) openSession(pick.id)
+  }
+  renderTabs()
+}
+window.__AF_META = m => {
+  if (!m || !m.id) return
+  noteMeta(m)
+}
+function noteMeta(m) {
+  const prev = seenState[m.id]
+  metas[m.id] = m
+  if (prev === 'running' && (m.state === 'done' || m.state === 'failed') && m.id !== active) {
+    pinged.add(m.id)
+    announce(`${m.project || 'A session'} is done${m.failed ? `, ${m.failed} agent${m.failed > 1 ? 's' : ''} failed` : ''}`, m.failed > 0)
+  }
+  seenState[m.id] = m.state
+  renderTabs()
+}
+
+function openSession(id) {
+  if (id === active) return
+  active = id
+  pinged.delete(id)
+  // a different session: start the page over on its data
+  graph = null; lastPush = 0; lastState = null; selected = MAIN
+  packets.clear(); contexts = { agents: {}, main: null }; packetsRev = -1; ctxRev = -1
+  for (const k of Object.keys(burn)) delete burn[k]
+  for (const k of Object.keys(nodes)) delete nodes[k]
+  for (const k of Object.keys(loading)) loading[k] = false
+  closeDrawer()
+  for (const el of [$('agents'), $('agent'), $('wire'), $('plate-in')]) { el.innerHTML = ''; el.dataset.html = '' }
+  try { history.replaceState(null, '', '#s=' + encodeURIComponent(id)) } catch {}
+  loadPins(); $('resetpins').hidden = !Object.keys(pins).length
+  if (DEMO) demoShow(id)
+  else { load(base() + 'state.js'); load(base() + 'packets.js'); load(base() + 'context.js') }
+  renderTabs()
+  // say what is happening until the session's data arrives, and what to do if it never does
+  const x = sessionList.find(s => s.id === id)
+  const name = (metas[id] && metas[id].project) || (x && x.project) || 'this session'
+  $('sw-title').textContent = 'Loading ' + name + '…'
+  $('sw-text').textContent = ''
+  $('switching').classList.add('show')
+  clearTimeout(openSession.timer)
+  openSession.timer = setTimeout(() => {
+    if (active !== id || lastPush) return
+    $('sw-title').textContent = 'No data from ' + name
+    $('sw-text').textContent = 'That session is closed or still runs an older version of the mod. In it, run /reload-plugins and then /agent-flow web.'
+  }, 3000)
+}
+
+function tabFacts(x, now) {
+  const m = metas[x.id] || {}
+  const live = now - (m.lastSeen || x.lastSeen || 0) < LIVE_MS
+  if (!live) return { cls: 'closed', text: 'closed' }
+  if (m.state === 'running') {
+    const subs = m.running || 0
+    return { cls: 'running', text: `${mmss(now - (m.turnStart || now))}${subs ? `, ${subs} agent${subs > 1 ? 's' : ''}` : ''}` }
+  }
+  if (m.state === 'failed') return { cls: 'failed', text: `done ${m.endedAt ? clock(m.endedAt).replace(/:\d\d(\s|$)/, '$1') : ''}, ${m.failed} failed` }
+  if (m.state === 'done') return { cls: 'done', text: `done ${m.endedAt ? clock(m.endedAt).replace(/:\d\d(\s|$)/, '$1') : ''}` }
+  return { cls: 'idle', text: 'idle' }
+}
+
+function renderTabs() {
+  const el = $('tabs')
+  if (!sessionList.length) { setHtml(el, ''); return }
+  const now = Date.now()
+  // live sessions first, closed ones after; buttons are only rebuilt when the set of sessions changes,
+  // so a clock ticking on a tab never swaps a button out from under the pointer
+  const live = x => now - ((metas[x.id] && metas[x.id].lastSeen) || x.lastSeen || 0) < LIVE_MS
+  // a session closed for over half an hour leaves the bar (its folder stays on disk)
+  const seen = x => (metas[x.id] && metas[x.id].lastSeen) || x.lastSeen || 0
+  const list = sessionList.filter(x => x.id === active || now - seen(x) < 30 * 60000).sort((x, y) => Number(live(y)) - Number(live(x)))
+  const skeleton = list.map(x => `<button type="button" role="tab" class="stab" data-sid="${esc(x.id)}"><i></i><span class="nm"></span><span class="sub"></span></button>`).join('')
+  setHtml(el, skeleton)
+  for (const b of el.querySelectorAll('button[data-sid]')) {
+    const x = sessionList.find(s => s.id === b.dataset.sid); if (!x) continue
+    const f = tabFacts(x, now)
+    const name = (metas[x.id] && metas[x.id].project) || x.project || 'session'
+    const cls = `stab ${f.cls}${pinged.has(x.id) ? ' ping' : ''}`
+    if (b.className !== cls) b.className = cls
+    const sel = String(x.id === active)
+    if (b.getAttribute('aria-selected') !== sel) b.setAttribute('aria-selected', sel)
+    if (b.children[1].textContent !== name) b.children[1].textContent = name
+    if (b.children[2].textContent !== f.text) b.children[2].textContent = f.text
+    const title = x.cwd || name
+    if (b.title !== title) b.title = title
+  }
+}
+
+/** A session in another tab finished: say so, and ring if asked to. */
+function announce(text, bad) {
+  const t = $('toast')
+  t.textContent = text
+  t.className = 'toast show' + (bad ? ' bad' : '')
+  clearTimeout(announce.timer)
+  announce.timer = setTimeout(() => { t.className = 'toast' }, 6000)
+  chime()
+  try {
+    if (bellOn && 'Notification' in window && Notification.permission === 'granted' && document.hidden) new Notification('AGENT//FLOW', { body: text })
+  } catch {}
+}
+
+const loading = {}
+function load(file) {
+  if (loading[file]) return
+  loading[file] = true
+  const s = document.createElement('script')
+  s.src = file + '?t=' + Date.now()
+  const done = () => { s.remove(); loading[file] = false }
+  s.onload = done
+  s.onerror = done
+  document.head.appendChild(s)
+}
+
+/** A loop the map never learned anything about (no name, no tokens, no tools) is noise: left out. */
+function inert(a) {
+  return a && a.id !== MAIN && a.type === 'agent' && !a.inTok && !a.outTok && !a.tools && !(a.liveOut > 0)
+}
+
+function treeOrder(g) {
+  const out = []
+  const seen = new Set()
+  const walk = (id, depth) => {
+    if (seen.has(id) || depth > 12) return
+    seen.add(id)
+    if (inert(g.agents[id])) return
+    out.push({ id, depth })
+    for (const c of g.order) if (g.agents[c] && g.agents[c].parent === id) walk(c, depth + 1)
+  }
+  walk(MAIN, 0)
+  for (const id of g.order) if (!seen.has(id)) walk(id, 1)
+  return out
+}
+
+/**
+ * Finished agents step off the map: it shows what is working now. Kept: the orchestrator, running
+ * and failed agents, ones that finished in the last minute, the selected one, and the parents that
+ * connect them. The timeline keeps this turn's agents. "Show finished" brings everything back; nothing
+ * is deleted, so their reports and packets stay one click away.
+ */
+const RECENT_MS = 60000
+let showDone = false
+function shownOrder(g, now, scope) {
+  const all = treeOrder(g)
+  if (showDone) return all
+  const m = g.agents[MAIN]
+  const turnStart = m ? m.startedAt : 0
+  const keep = new Set([MAIN, selected])
+  for (const { id } of all) {
+    const a = g.agents[id]; if (!a) continue
+    const recent = a.endedAt && now - a.endedAt < RECENT_MS
+    const thisTurn = a.startedAt >= turnStart - 1000
+    if (a.status === 'running' || a.status === 'error' || recent || (scope === 'timeline' && thisTurn)) keep.add(id)
+  }
+  for (const id of [...keep]) { let p = g.agents[id] && g.agents[id].parent; let n = 0; while (p && !keep.has(p) && n++ < 12) { keep.add(p); p = g.agents[p] && g.agents[p].parent } }
+  return all.filter(x => keep.has(x.id))
+}
+function hiddenCount(g, now) {
+  if (showDone) return 0
+  return treeOrder(g).length - shownOrder(g, now, 'map').length
+}
+function toggleDone() {
+  showDone = !showDone
+  try { localStorage.setItem('agent-flow-done', showDone ? '1' : '') } catch {}
+  for (const el of [$('agents')]) el.dataset.html = ''
+  renderRail()
+}
+
+/** What deserves the developer's eyes now: failures, and running agents gone quiet. */
+function attentionItems(g, now) {
+  const items = []
+  for (const id of g.order) {
+    const a = g.agents[id]; if (!a || inert(a)) continue
+    if (a.status === 'error') items.push({ id, kind: 'error', text: `${a.label} failed` })
+    else if (a.status === 'running' && a.lastActiveAt && now - a.lastActiveAt > QUIET_MS && !a.activity)
+      items.push({ id, kind: 'quiet', text: `${a.label} has been quiet for ${dur(now - a.lastActiveAt)}` })
+    else if (a.status === 'running' && a.activity && a.toolLog && a.toolLog.length) {
+      const last = a.toolLog[a.toolLog.length - 1]
+      if (last && last.end === undefined && now - last.at > QUIET_MS)
+        items.push({ id, kind: 'quiet', text: `${a.label} has waited ${dur(now - last.at)} on ${clip(last.text, 40)}` })
+    }
+  }
+  return items
+}
+
+// ---------- "when is it done" ----------
+function progressOf(a) {
+  const list = (a && a.todos) || []
+  const cur = list.find(t => t.status === 'in_progress')
+  return { done: list.filter(t => t.status === 'completed').length, total: list.length, current: cur ? (cur.active || cur.text) : null }
+}
+
+/** How long runs like this usually take, from finished ones: null until there are three. */
+function usual(key) {
+  const list = (durations[key] || []).filter(x => x > 0).slice().sort((x, y) => x - y)
+  if (list.length < 3) return null
+  const q = p => list[Math.min(list.length - 1, Math.floor(p * (list.length - 1) + 0.5))]
+  return { median: q(0.5), p80: q(0.8), n: list.length }
+}
+
+/** An agent's own estimate line: from its plan when it has one, else from how long its kind usually takes. */
+function etaOf(a, now) {
+  if (!a) return null
+  const p = progressOf(a)
+  const key = a.id === MAIN ? MAIN_TURN : a.type
+  const u = usual(key)
+  const running = a.status === 'running'
+  const elapsed = (a.endedAt || now) - a.startedAt
+  if (!running) return { frac: a.status === 'done' || (a.id === MAIN && a.endedAt) ? 1 : null, plan: p, u, elapsed, text: null }
+  let text = null, frac = null, estimate = false
+  if (p.total) frac = p.done / p.total
+  if (u) {
+    const left = u.median - elapsed
+    if (left > 0) text = `<b>About ${dur(left)} left</b>, judging by ${u.n} earlier ${a.id === MAIN ? 'turns' : esc(a.type) + ' runs'} (usually ${dur(u.median)})`
+    else if (elapsed <= u.p80) text = `<b>Should finish soon</b>: ${a.id === MAIN ? 'turns' : esc(a.type) + ' runs'} usually take ${dur(u.median)}`
+    else text = `<b>Running longer than usual</b>: ${dur(elapsed)} so far, usually ${dur(u.median)}`
+    if (frac === null) { frac = Math.min(0.97, elapsed / Math.max(1, u.median)); estimate = true }
+  } else if (!p.total) {
+    text = `No estimate yet: it needs three finished ${a.id === MAIN ? 'turns' : esc(a.type) + ' runs'} to compare with`
+  }
+  return { frac, estimate, plan: p, u, elapsed, text }
+}
+
+function mission(g, now) {
+  const m = g.agents[MAIN]
+  const turnStart = m ? m.startedAt : g.startedAt
+  const inTurn = g.order.map(id => g.agents[id]).filter(a => a && !inert(a) && a.id !== MAIN && a.startedAt >= turnStart - 1000)
+  const running = g.order.map(id => g.agents[id]).filter(a => a && !inert(a) && a.status === 'running')
+  const failed = inTurn.filter(a => a.status === 'error')
+  const done = inTurn.filter(a => a.status === 'done')
+  let state = 'idle'
+  if (running.length) state = 'running'
+  else if (m && m.endedAt) state = failed.length ? 'failed' : 'done'
+  // the plan: main's if it has one, else every agent's together
+  let plan = progressOf(m)
+  if (!plan.total) {
+    const all = g.order.flatMap(id => (g.agents[id] && g.agents[id].todos) || [])
+    const cur = all.find(t => t.status === 'in_progress')
+    plan = { done: all.filter(t => t.status === 'completed').length, total: all.length, current: cur ? (cur.active || cur.text) : null }
+  }
+  return { state, m, turnStart, inTurn, running, failed, done, plan }
+}
+
+// ---------- canvas ----------
+const canvas = $('c')
+const ctx = canvas.getContext('2d')
+let W = 0, H = 0, DPR = 1
+let backdrop = null
+const sprites = {}
+let numFont = 'monospace', displayFont = 'sans-serif'
+
+function resize() {
+  const r = canvas.getBoundingClientRect()
+  DPR = Math.min(2, window.devicePixelRatio || 1)
+  W = Math.max(1, r.width)
+  H = Math.max(1, r.height)
+  canvas.width = Math.round(W * DPR)
+  canvas.height = Math.round(H * DPR)
+  backdrop = makeBackdrop()
+}
+
+/** The room: violet dark, a perspective grid floor, faint data dust. Drawn once per size. */
+function makeBackdrop() {
+  const c = document.createElement('canvas')
+  c.width = canvas.width
+  c.height = canvas.height
+  const g = c.getContext('2d')
+  g.scale(DPR, DPR)
+  g.fillStyle = '#0a0614'
+  g.fillRect(0, 0, W, H)
+  const sky = g.createRadialGradient(W * 0.5, H * 0.1, 0, W * 0.5, H * 0.1, Math.hypot(W, H) * 0.75)
+  sky.addColorStop(0, 'rgba(90, 30, 150, 0.30)')
+  sky.addColorStop(0.6, 'rgba(40, 10, 80, 0.12)')
+  sky.addColorStop(1, 'rgba(0,0,0,0)')
+  g.fillStyle = sky
+  g.fillRect(0, 0, W, H)
+  // grid floor
+  const horizon = H * 0.62
+  const vx = W * 0.5
+  g.save()
+  g.beginPath(); g.rect(0, horizon, W, H - horizon); g.clip()
+  const fade = g.createLinearGradient(0, horizon, 0, H)
+  fade.addColorStop(0, 'rgba(255,46,136,0)')
+  fade.addColorStop(1, 'rgba(255,46,136,0.20)')
+  g.strokeStyle = fade
+  g.lineWidth = 1
+  for (let k = -24; k <= 24; k++) {
+    g.beginPath(); g.moveTo(vx + k * 6, horizon); g.lineTo(vx + k * W * 0.16, H); g.stroke()
+  }
+  for (let k = 1; k < 14; k++) {
+    const y = horizon + (H - horizon) * Math.pow(k / 13, 2.2)
+    g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke()
+  }
+  g.restore()
+  g.fillStyle = 'rgba(180, 140, 255, 0.09)'
+  for (let y = 18; y < horizon; y += 30) for (let x = 18; x < W; x += 30) g.fillRect(x, y, 1.3, 1.3)
+  return c
+}
+
+function sprite(hex) {
+  if (sprites[hex]) return sprites[hex]
+  const s = document.createElement('canvas')
+  s.width = s.height = 128
+  const g = s.getContext('2d')
+  const [r, gg, b] = rgb(hex)
+  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64)
+  grad.addColorStop(0, `rgba(${r},${gg},${b},1)`)
+  grad.addColorStop(0.18, `rgba(${r},${gg},${b},0.55)`)
+  grad.addColorStop(0.45, `rgba(${r},${gg},${b},0.16)`)
+  grad.addColorStop(1, `rgba(${r},${gg},${b},0)`)
+  g.fillStyle = grad
+  g.fillRect(0, 0, 128, 128)
+  return (sprites[hex] = s)
+}
+function glow(x, y, radius, hex, alpha) {
+  if (alpha <= 0) return
+  ctx.globalAlpha = Math.min(1, alpha)
+  ctx.drawImage(sprite(hex), x - radius, y - radius, radius * 2, radius * 2)
+  ctx.globalAlpha = 1
+}
+
+// ---------- map view ----------
+const nodes = {}
+const LABELS = 92
+
+function layout(g, top, now) {
+  const bands = []
+  for (const { id, depth } of shownOrder(g, now, 'map')) (bands[depth] || (bands[depth] = [])).push(id)
+  // a crowded generation wraps onto more rows instead of shrinking every orb to a dot
+  const perRow = Math.max(3, Math.floor(W / 150))
+  const rows = []
+  for (const ids of bands) if (ids) for (let k = 0; k < ids.length; k += perRow) rows.push(ids.slice(k, k + perRow))
+  const bandH = Math.max(150, Math.min(260, (H - top - 30) / Math.max(1, rows.length)))
+  const widest = Math.max(1, ...rows.map(r => r.length))
+  const rMax = Math.max(14, Math.min(42, (bandH - LABELS - 40) / 2, W / widest / 4.4))
+  const target = {}
+  rows.forEach((ids, row) => {
+    const slot = W / ids.length
+    ids.forEach((id, k) => {
+      const a = g.agents[id]
+      if (!a) return
+      const tok = a.inTok + a.outTok + (a.liveOut || 0)
+      const scale = tok <= 0 ? 0 : Math.min(1, Math.log10(tok + 1) / 6)
+      const pin = pins[id]
+      target[id] = pin
+        ? { x: pin.fx * W, y: pin.fy * H, r: rMax * (0.62 + 0.38 * scale), slot, pinned: true }
+        : { x: slot * k + slot / 2, y: top + row * bandH + rMax + 6, r: rMax * (0.62 + 0.38 * scale), slot }
+    })
+  })
+  return target
+}
+
+function wirePath(from, to) {
+  const ring = 26 // the HUD rings around an orb
+  if (to.y - to.r - ring > from.y + from.r + LABELS + 10) {
+    // the usual tree: down from under the parent's labels, into the top of the child's rings
+    const p0 = { x: from.x, y: from.y + from.r + LABELS }
+    const p3 = { x: to.x, y: to.y - to.r - ring }
+    const my = (p0.y + p3.y) / 2
+    return { p0, p1: { x: p0.x, y: my }, p2: { x: p3.x, y: my }, p3 }
+  }
+  // dragged somewhere else: edge to edge, bending along the way
+  const d = Math.max(1, Math.hypot(to.x - from.x, to.y - from.y))
+  const ux = (to.x - from.x) / d, uy = (to.y - from.y) / d
+  const p0 = { x: from.x + ux * (from.r + ring), y: from.y + uy * (from.r + ring) }
+  const p3 = { x: to.x - ux * (to.r + ring), y: to.y - uy * (to.r + ring) }
+  const k = Math.min(120, d / 3)
+  return { p0, p1: { x: p0.x + ux * k, y: p0.y + uy * k + k * 0.3 }, p2: { x: p3.x - ux * k, y: p3.y - uy * k + k * 0.3 }, p3 }
+}
+/** A port: the glowing dot where a wire meets an orb. */
+function port(p, color, alpha) {
+  ctx.beginPath(); ctx.arc(p.x, p.y, 3.2, 0, Math.PI * 2)
+  ctx.fillStyle = rgba(color, alpha); ctx.shadowColor = color; ctx.shadowBlur = 8; ctx.fill(); ctx.shadowBlur = 0
+}
+/** A channel between two agents that are not parent and child: a low arc over their shoulders. */
+function arcPath(from, to) {
+  const dir = to.x >= from.x ? 1 : -1
+  const p0 = { x: from.x + dir * from.r * 0.85, y: from.y - from.r * 0.5 }
+  const p3 = { x: to.x - dir * to.r * 0.85, y: to.y - to.r * 0.5 }
+  const topY = Math.min(p0.y, p3.y) - Math.min(70, Math.max(34, Math.abs(p3.x - p0.x) / 5))
+  return { p0, p1: { x: p0.x + dir * 20, y: topY }, p2: { x: p3.x - dir * 20, y: topY }, p3 }
+}
+const at = (b, t) => {
+  const u = 1 - t
+  return {
+    x: u * u * u * b.p0.x + 3 * u * u * t * b.p1.x + 3 * u * t * t * b.p2.x + t * t * t * b.p3.x,
+    y: u * u * u * b.p0.y + 3 * u * u * t * b.p1.y + 3 * u * t * t * b.p2.y + t * t * t * b.p3.y,
+  }
+}
+const reverse = b => ({ p0: b.p3, p1: b.p2, p2: b.p1, p3: b.p0 })
+const lengthOf = b => { let L = 0, p = b.p0; for (let i = 1; i <= 20; i++) { const q = at(b, i / 20); L += Math.hypot(q.x - p.x, q.y - p.y); p = q } return L }
+const ease = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+const travelMs = b => Math.max(900, Math.min(2100, 650 + lengthOf(b) * 2.2))
+
+function strokeBezier(b, color, width, alpha, from = 0, to = 1) {
+  ctx.beginPath()
+  const steps = 40
+  for (let i = 0; i <= steps; i++) {
+    const p = at(b, from + (to - from) * (i / steps))
+    i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)
+  }
+  ctx.strokeStyle = rgba(color, alpha)
+  ctx.lineWidth = width
+  ctx.stroke()
+}
+
+let hoverId = null
+let lastFrame = performance.now()
+
+/** Where drawing may start: below the bar and the attention chips, however they wrapped. */
+function topOffset() {
+  return Math.max(84, $('hud').getBoundingClientRect().bottom - canvas.getBoundingClientRect().top + 22)
+}
+
+function drawMap(g, t) {
+  const target = layout(g, topOffset(), t)
+  const k = 1 - Math.exp(-frameDt / 140)
+  for (const id of Object.keys(target)) {
+    const p = target[id]
+    const n = nodes[id] || (nodes[id] = { x: p.x, y: p.y - 30, r: 0 })
+    if (!(drag && drag.id === id && drag.moved)) {
+      n.x += (p.x - n.x) * k
+      n.y += (p.y - n.y) * k
+    }
+    n.r += (p.r - n.r) * k
+    n.slot = p.slot
+  }
+  for (const id of Object.keys(nodes)) if (!target[id]) delete nodes[id]
+
+  // parent → child wires
+  const wires = {}
+  for (const id of g.order) {
+    const a = g.agents[id]
+    if (!a || id === MAIN) continue
+    const from = nodes[a.parent || MAIN], to = nodes[id]
+    if (!from || !to) continue
+    const b = wirePath(from, to)
+    wires[(a.parent || MAIN) + '>' + id] = b
+    strokeBezier(b, colorOf(a), 1.5, a.status === 'running' ? 0.36 : 0.18)
+    port(b.p0, colorOf(a), a.status === 'running' ? 0.9 : 0.4)
+    port(b.p3, colorOf(a), a.status === 'running' ? 0.9 : 0.4)
+  }
+  // standing channels: agents that messaged each other directly
+  const chans = {}
+  ctx.save()
+  ctx.setLineDash([4, 6])
+  for (const ch of Object.values(g.channels || {})) {
+    const A = nodes[ch.a], B = nodes[ch.b]
+    if (!A || !B) continue
+    const left = A.x <= B.x ? A : B, right = left === A ? B : A
+    const b = arcPath(left, right)
+    chans[ch.a + '|' + ch.b] = chans[ch.b + '|' + ch.a] = { b, leftId: left === A ? ch.a : ch.b }
+    strokeBezier(b, '#FF2E88', 1.3, t - ch.last < 6000 ? 0.75 : 0.4)
+    const mid = at(b, 0.5)
+    ctx.setLineDash([])
+    ctx.font = `600 12px ${numFont}`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
+    ctx.fillStyle = 'rgba(255,46,136,0.9)'
+    ctx.fillText(`✉ ${ch.count}`, mid.x, mid.y - 4)
+    ctx.setLineDash([4, 6])
+  }
+  ctx.restore()
+
+  ctx.globalCompositeOperation = 'lighter'
+  for (const id of Object.keys(nodes)) {
+    const a = g.agents[id], n = nodes[id]
+    if (!a) continue
+    glow(n.x, n.y, n.r * 2.6, colorOf(a), a.status === 'running' ? 0.55 : 0.3)
+  }
+  ctx.globalCompositeOperation = 'source-over'
+  for (const id of Object.keys(nodes)) drawOrb(g.agents[id], nodes[id], t)
+
+  const tags = []
+  for (const l of g.links) {
+    if (l.at < pageStart - 2500) continue
+    const from = nodes[l.from], to = nodes[l.to]
+    if (!from || !to || l.from === l.to) continue
+    let b = null
+    if (wires[l.from + '>' + l.to]) b = wires[l.from + '>' + l.to]
+    else if (wires[l.to + '>' + l.from]) b = reverse(wires[l.to + '>' + l.from])
+    else if (chans[l.from + '|' + l.to]) { const c = chans[l.from + '|' + l.to]; b = c.leftId === l.from ? c.b : reverse(c.b) }
+    if (!b) continue // never a packet across empty space: it travels a wire or a channel
+    const T = travelMs(b)
+    const e = t - l.at
+    if (e < 0 || e > T + IMPACT_MS) continue
+    const color = l.kind === 'message' ? '#FF2E88' : g.agents[l.from] ? colorOf(g.agents[l.from]) : '#FFFFFF'
+    if (e < T) comet(b, color, e / T, l, tags)
+    else burst(to, color, (e - T) / IMPACT_MS, l, tags)
+  }
+  ctx.textBaseline = 'middle'
+  ctx.textAlign = 'left'
+  ctx.font = '600 13px ' + numFont
+  for (const tag of tags) {
+    ctx.globalAlpha = tag.a
+    ctx.fillStyle = 'rgba(10,6,20,0.85)'
+    ctx.fillText(tag.s, tag.x + 1, tag.y + 1)
+    ctx.fillStyle = tag.c
+    ctx.fillText(tag.s, tag.x, tag.y)
+    ctx.globalAlpha = 1
+  }
+}
+
+function brackets(x, y, s, color, alpha) {
+  const L = Math.max(7, s * 0.28)
+  ctx.strokeStyle = rgba(color, alpha); ctx.lineWidth = 1.6
+  for (const [kx, ky] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+    ctx.beginPath()
+    ctx.moveTo(x + kx * s, y + ky * (s - L)); ctx.lineTo(x + kx * s, y + ky * s); ctx.lineTo(x + kx * (s - L), y + ky * s)
+    ctx.stroke()
+  }
+}
+
+// ---------- neon gradients ----------
+/** The colour a third of the way round the wheel: each orb's gradient runs from its colour to this one. */
+const partners = {}
+function partner(hex) {
+  if (partners[hex]) return partners[hex]
+  let [r, g, b] = rgb(hex).map(v => v / 255)
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min
+  let h = 0
+  const sat = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1))
+  if (d) h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+  h = (h * 60 + 360 + 110) % 360
+  const C = (1 - Math.abs(2 * l - 1)) * sat, X = C * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - C / 2
+  const [R, G, B] = h < 60 ? [C, X, 0] : h < 120 ? [X, C, 0] : h < 180 ? [0, C, X] : h < 240 ? [0, X, C] : h < 300 ? [X, 0, C] : [C, 0, X]
+  const to = v => Math.round((v + m) * 255).toString(16).padStart(2, '0')
+  return (partners[hex] = '#' + to(R) + to(G) + to(B))
+}
+/** A gradient sweeping round a circle, turning with `spin`: the neon edge of an orb and its rings. */
+function sweep(x, y, c, spin, alpha) {
+  const c2 = partner(c)
+  if (ctx.createConicGradient) {
+    const g = ctx.createConicGradient(spin, x, y)
+    g.addColorStop(0, rgba(c, alpha)); g.addColorStop(0.45, rgba(c2, alpha)); g.addColorStop(0.75, rgba(c, alpha * 0.55)); g.addColorStop(1, rgba(c, alpha))
+    return g
+  }
+  const g = ctx.createLinearGradient(x - 40, y - 40, x + 40, y + 40)
+  g.addColorStop(0, rgba(c, alpha)); g.addColorStop(1, rgba(c2, alpha))
+  return g
+}
+
+// ---------- icons: what kind of work an agent does, drawn as neon line art ----------
+/** The icon for an agent's task, from what it was asked to do and the type it runs as. */
+function taskIcon(a) {
+  if (a.id === MAIN) return 'bot'
+  // a specific type says it all; a generic one (general-purpose) is read from its task
+  if (a.type === 'Explore') return 'search'
+  if (a.type === 'Plan') return 'plan'
+  const t = ((a.role || '') + ' ' + (a.task || '')).toLowerCase()
+  if (/\btest|k6|load test|benchmark|qa\b/.test(t)) return 'test'
+  if (/review|audit|check|verify|inspect|validate/.test(t)) return 'review'
+  if (/\bplan|design|architect|propos|strategy/.test(t)) return 'plan'
+  if (/implement|code|fix|refactor|build|patch|migrate code|feature|bug/.test(t)) return 'code'
+  if (/explore|find|search|map |map$|scan|locate|grep|look|investigat|where/.test(t)) return 'search'
+  if (/\bdb\b|sql|database|schema|storage|data|migrat/.test(t)) return 'data'
+  if (/web|research|fetch|browse|docs? online|internet/.test(t)) return 'globe'
+  if (/deploy|run |shell|bash|ci\b|pipeline|release/.test(t)) return 'terminal'
+  if (/doc|readme|summar|report|write|draft|explain/.test(t)) return 'doc'
+  if (/message|ask|reply|chat/.test(t)) return 'chat'
+  return 'gear'
+}
+/** The icon for the tool it is running now, from the activity line ("Read src/a.ts", "Bash: ..."). */
+function toolIcon(activity) {
+  const t = String(activity || '')
+  if (/^(Read|NotebookRead)\b/.test(t)) return 'doc'
+  if (/^(Grep|Glob|ToolSearch)\b/.test(t)) return 'search'
+  if (/^Bash\b/.test(t)) return 'terminal'
+  if (/^(Edit|Write|NotebookEdit|MultiEdit)\b/.test(t)) return 'code'
+  if (/^Web/.test(t)) return 'globe'
+  if (/^Agent\b/.test(t)) return 'bot'
+  if (/^(TodoWrite|Task)/.test(t)) return 'plan'
+  if (/^SendMessage/.test(t)) return 'chat'
+  return 'gear'
+}
+function icon(kind, x, y, s, color, alpha) {
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.strokeStyle = rgba(color, alpha); ctx.fillStyle = rgba(color, alpha)
+  ctx.lineWidth = Math.max(1.4, s * 0.12); ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+  ctx.shadowColor = color; ctx.shadowBlur = s * 0.5
+  const P = (...pts) => { ctx.beginPath(); pts.forEach(([px, py], i) => (i ? ctx.lineTo(px * s, py * s) : ctx.moveTo(px * s, py * s))); ctx.stroke() }
+  const O = (cx, cy, r, a0 = 0, a1 = Math.PI * 2) => { ctx.beginPath(); ctx.arc(cx * s, cy * s, r * s, a0, a1); ctx.stroke() }
+  const R = (x0, y0, w, h, r) => { ctx.beginPath(); ctx.moveTo((x0 + r) * s, y0 * s); ctx.arcTo((x0 + w) * s, y0 * s, (x0 + w) * s, (y0 + h) * s, r * s); ctx.arcTo((x0 + w) * s, (y0 + h) * s, x0 * s, (y0 + h) * s, r * s); ctx.arcTo(x0 * s, (y0 + h) * s, x0 * s, y0 * s, r * s); ctx.arcTo(x0 * s, y0 * s, (x0 + w) * s, y0 * s, r * s); ctx.closePath(); ctx.stroke() }
+  const D = (cx, cy, r) => { ctx.beginPath(); ctx.arc(cx * s, cy * s, r * s, 0, Math.PI * 2); ctx.fill() }
+  switch (kind) {
+    case 'search': O(-0.15, -0.15, 0.45); P([0.18, 0.18], [0.62, 0.62]); break
+    case 'plan': R(-0.48, -0.55, 0.96, 1.15, 0.12); P([-0.2, -0.62], [0.2, -0.62]); P([-0.26, -0.15], [-0.14, -0.03], [0.06, -0.27]); P([0.14, -0.15], [0.3, -0.15]); P([-0.26, 0.25], [0.3, 0.25]); break
+    case 'code': P([-0.28, -0.42], [-0.68, 0], [-0.28, 0.42]); P([0.28, -0.42], [0.68, 0], [0.28, 0.42]); P([0.12, -0.55], [-0.12, 0.55]); break
+    case 'review': ctx.beginPath(); ctx.moveTo(-0.7 * s, 0); ctx.quadraticCurveTo(0, -0.62 * s, 0.7 * s, 0); ctx.quadraticCurveTo(0, 0.62 * s, -0.7 * s, 0); ctx.stroke(); O(0, 0, 0.2); D(0, 0, 0.07); break
+    case 'test': P([-0.32, -0.62], [0.32, -0.62]); P([-0.2, -0.62], [-0.2, -0.14], [-0.6, 0.55], [0.6, 0.55], [0.2, -0.14], [0.2, -0.62]); P([-0.38, 0.2], [0.38, 0.2]); break
+    case 'doc': P([-0.42, -0.6], [0.16, -0.6], [0.42, -0.34], [0.42, 0.6], [-0.42, 0.6], [-0.42, -0.6]); P([0.16, -0.6], [0.16, -0.34], [0.42, -0.34]); P([-0.22, -0.05], [0.22, -0.05]); P([-0.22, 0.25], [0.22, 0.25]); break
+    case 'terminal': R(-0.62, -0.48, 1.24, 0.96, 0.12); P([-0.34, -0.16], [-0.12, 0.04], [-0.34, 0.24]); P([0.04, 0.24], [0.34, 0.24]); break
+    case 'globe': O(0, 0, 0.6); P([-0.6, 0], [0.6, 0]); ctx.beginPath(); ctx.ellipse(0, 0, 0.26 * s, 0.6 * s, 0, 0, Math.PI * 2); ctx.stroke(); break
+    case 'data': ctx.beginPath(); ctx.ellipse(0, -0.42 * s, 0.5 * s, 0.17 * s, 0, 0, Math.PI * 2); ctx.stroke(); P([-0.5, -0.42], [-0.5, 0.42]); P([0.5, -0.42], [0.5, 0.42]); ctx.beginPath(); ctx.ellipse(0, 0.42 * s, 0.5 * s, 0.17 * s, 0, 0, Math.PI); ctx.stroke(); ctx.beginPath(); ctx.ellipse(0, 0, 0.5 * s, 0.17 * s, 0, 0, Math.PI); ctx.stroke(); break
+    case 'bot': R(-0.55, -0.32, 1.1, 0.8, 0.22); P([0, -0.32], [0, -0.58]); D(0, -0.66, 0.08); D(-0.22, 0.06, 0.09); D(0.22, 0.06, 0.09); P([-0.7, 0], [-0.7, 0.22]); P([0.7, 0], [0.7, 0.22]); break
+    case 'chat': R(-0.6, -0.45, 1.2, 0.8, 0.22); P([-0.25, 0.35], [-0.4, 0.62], [0.02, 0.35]); D(-0.25, -0.05, 0.06); D(0, -0.05, 0.06); D(0.25, -0.05, 0.06); break
+    default: { // gear
+      O(0, 0, 0.36); O(0, 0, 0.12)
+      for (let k = 0; k < 8; k++) { const an = (k / 8) * Math.PI * 2; P([Math.cos(an) * 0.42, Math.sin(an) * 0.42], [Math.cos(an) * 0.62, Math.sin(an) * 0.62]) }
+    }
+  }
+  ctx.restore()
+}
+
+function drawOrb(a, n, t) {
+  if (!a || n.r < 4) return
+  const c = colorOf(a)
+  const running = a.status === 'running'
+  const finished = a.status === 'done' || (a.id === MAIN && a.endedAt && !running)
+  const alpha = running ? 1 : a.status === 'error' ? 0.95 : 0.6
+  const spin = REDUCED ? 0 : t / 1100
+  const x = n.x, y = n.y, r = n.r
+
+  // body: a dark glass disc lit from inside in the agent's colour
+  const body = ctx.createRadialGradient(x - r * 0.25, y - r * 0.3, r * 0.05, x, y, r)
+  body.addColorStop(0, rgba(c, 0.42 * alpha))
+  body.addColorStop(0.6, rgba(partner(c), 0.12 * alpha))
+  body.addColorStop(1, 'rgba(10,6,20,0.94)')
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = body; ctx.fill()
+  // the neon edge: a gradient that turns while it works
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2)
+  ctx.lineWidth = running ? 3 : 2
+  ctx.strokeStyle = sweep(x, y, c, running ? spin * 1.6 : 0.8, alpha)
+  ctx.shadowColor = c; ctx.shadowBlur = running ? 20 : 8
+  ctx.stroke(); ctx.shadowBlur = 0
+
+  const p = progressOf(a)
+  const R1 = r + 8, R2 = r + 15, R3 = r + 22
+  if (running) {
+    // HUD ring 1: segmented, turning clockwise
+    ctx.save()
+    ctx.lineWidth = 3.2
+    ctx.strokeStyle = sweep(x, y, c, -spin, 0.95)
+    const segs = 10, gap = 0.16
+    for (let k = 0; k < segs; k++) {
+      const a0 = spin + (k / segs) * Math.PI * 2
+      ctx.beginPath(); ctx.arc(x, y, R1, a0, a0 + (Math.PI * 2) / segs - gap); ctx.stroke()
+    }
+    // HUD ring 2: a fine circle with ticks, turning the other way
+    ctx.lineWidth = 1
+    ctx.strokeStyle = rgba(c, 0.35)
+    ctx.beginPath(); ctx.arc(x, y, R2, 0, Math.PI * 2); ctx.stroke()
+    ctx.strokeStyle = rgba(partner(c), 0.7)
+    ctx.beginPath()
+    for (let k = 0; k < 48; k++) {
+      const an = -spin * 0.6 + (k / 48) * Math.PI * 2, len = k % 4 === 0 ? 5 : 2.5
+      ctx.moveTo(x + Math.cos(an) * R2, y + Math.sin(an) * R2)
+      ctx.lineTo(x + Math.cos(an) * (R2 + len), y + Math.sin(an) * (R2 + len))
+    }
+    ctx.stroke()
+    // HUD ring 3: two thick brackets breathing at the sides, a scanner sweeping between them
+    const breathe = REDUCED ? 0 : Math.sin(t / 500) * 0.06
+    ctx.lineWidth = 3.5; ctx.lineCap = 'butt'
+    ctx.strokeStyle = rgba(c, 0.85)
+    for (const mid of [0, Math.PI]) {
+      ctx.beginPath(); ctx.arc(x, y, R3, mid - 0.55 - breathe, mid + 0.55 + breathe); ctx.stroke()
+    }
+    ctx.lineWidth = 2
+    ctx.strokeStyle = rgba(partner(c), 0.9)
+    const scan = spin * 2.2
+    ctx.beginPath(); ctx.arc(x, y, R3, scan, scan + 0.35); ctx.stroke()
+    ctx.restore()
+    // the heartbeat
+    if (!REDUCED) {
+      const beat = (t % 2000) / 2000
+      ctx.beginPath(); ctx.arc(x, y, r + beat * 30, 0, Math.PI * 2)
+      ctx.lineWidth = 1.5; ctx.strokeStyle = rgba(c, 0.45 * (1 - beat) * (1 - beat)); ctx.stroke()
+    }
+  } else {
+    ctx.beginPath(); ctx.arc(x, y, R1, 0, Math.PI * 2)
+    ctx.lineWidth = 1; ctx.strokeStyle = rgba(c, 0.22); ctx.stroke()
+  }
+  // its plan, as an arc filling on the tick ring
+  if (p.total) {
+    ctx.save(); ctx.lineCap = 'round'
+    ctx.beginPath(); ctx.arc(x, y, R2 - 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (p.done / p.total))
+    ctx.lineWidth = 2.6; ctx.strokeStyle = rgba('#F3E600', 0.95); ctx.shadowColor = '#F3E600'; ctx.shadowBlur = 8; ctx.stroke()
+    ctx.restore()
+  }
+  if (selected === a.id) brackets(x, y, r + 30, '#FFFFFF', 0.85)
+  else if (hoverId === a.id) brackets(x, y, r + 30, '#FFFFFF', 0.35)
+
+  // the task's icon in the middle
+  icon(taskIcon(a), x, y, r * 0.52, running ? '#ffffff' : c, running ? 0.95 : 0.8)
+  // a badge on the rim: the tool running now, or how it ended
+  const bx = x + r * 0.72, by = y + r * 0.72, br = Math.max(7, r * 0.3)
+  const badge = (fill, edge) => {
+    ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2)
+    ctx.fillStyle = fill; ctx.fill()
+    ctx.lineWidth = 1.5; ctx.strokeStyle = edge; ctx.shadowColor = edge; ctx.shadowBlur = 8; ctx.stroke(); ctx.shadowBlur = 0
+  }
+  if (running && a.activity) {
+    badge('rgba(10,6,20,0.95)', c)
+    icon(toolIcon(a.activity), bx, by, br * 0.62, partner(c), 1)
+  } else if (a.status === 'error') {
+    badge('rgba(60,8,20,0.95)', '#FF3355')
+    ctx.fillStyle = '#ffd0d8'; ctx.font = `700 ${br * 1.2}px ${displayFont}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('!', bx, by + 1)
+  } else if (finished) {
+    badge('rgba(10,6,20,0.95)', rgba(c, 0.8))
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 1.8; ctx.lineCap = 'round'
+    ctx.beginPath(); ctx.moveTo(bx - br * 0.4, by); ctx.lineTo(bx - br * 0.1, by + br * 0.32); ctx.lineTo(bx + br * 0.42, by - br * 0.32); ctx.stroke(); ctx.restore()
+  }
+
+  // labels under the rings
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  const narrow = (n.slot || 200) < 130
+  const room = Math.max(8, Math.floor((n.slot || 200) / (narrow ? 7.4 : 7.6)) - 2)
+  let ly = y + r + 38
+  ctx.font = `600 ${narrow ? 13 : 15.5}px ${displayFont}`
+  ctx.fillStyle = c
+  ctx.fillText(clip(a.label, room), x, ly)
+  ly += narrow ? 16 : 19
+  const inT = fmt(a.inTok), outT = fmt(a.outTok + Math.round(a.liveOut || 0))
+  ctx.font = `500 ${narrow ? 10.5 : 12}px ${numFont}`
+  const sep = narrow ? ' / ' : '  /  '
+  const extra = (running && a.tps > 0 ? `  ${Math.round(a.tps)} tok/s` : '') + (p.total ? `  ${p.done}/${p.total}` : '')
+  const wIn = ctx.measureText(inT).width, wSep = ctx.measureText(sep).width, wOut = ctx.measureText(outT).width, wEx = ctx.measureText(extra).width
+  let lx = x - (wIn + wSep + wOut + wEx) / 2
+  ctx.textAlign = 'left'
+  ctx.fillStyle = '#7fe7ff'; ctx.fillText(inT, lx, ly); lx += wIn
+  ctx.fillStyle = '#5b5285'; ctx.fillText(sep, lx, ly); lx += wSep
+  ctx.fillStyle = '#ff9bc8'; ctx.fillText(outT, lx, ly); lx += wOut
+  if (extra) { ctx.fillStyle = '#f3e600'; ctx.fillText(extra, lx, ly) }
+  ctx.textAlign = 'center'
+  ly += narrow ? 15 : 18
+  ctx.font = `500 ${narrow ? 11.5 : 13}px ${displayFont}`
+  ctx.fillStyle = a.activity ? '#e2dbff' : '#9188bc'
+  // when the name already is its task, the last line says how it is going instead of repeating it
+  const named = a.role && a.role.startsWith(a.label.replace(/(…| #\d+)+$/, ''))
+  const how = a.status === 'done' ? 'done in ' + dur((a.endedAt || t) - a.startedAt) : a.status === 'error' ? 'failed' : running ? 'working' : a.role
+  ctx.fillText(clip(a.activity || (p.current && running ? p.current : named ? how : a.role), room + 4), x, ly)
+}
+
+function comet(b, color, p, l, tags) {
+  const head = ease(p)
+  ctx.lineCap = 'round'
+  strokeBezier(b, color, 2.4, 0.55, Math.max(0, head - 0.35), head)
+  ctx.globalCompositeOperation = 'lighter'
+  if (!REDUCED) for (let i = 16; i >= 1; i--) {
+    const q = at(b, Math.max(0, head - i * 0.014))
+    glow(q.x, q.y, 9 - i * 0.35, color, 0.55 * (1 - i / 17))
+  }
+  const h = at(b, head)
+  glow(h.x, h.y, 34, color, 0.75)
+  glow(h.x, h.y, 12, color, 1)
+  glow(h.x, h.y, 6, '#FFFFFF', 1)
+  ctx.globalCompositeOperation = 'source-over'
+  const sym = l.kind === 'spawn' ? '↓' : l.kind === 'report' ? '↑' : '✉'
+  tags.push({ x: h.x + 16, y: h.y - 12, s: `${sym} ${fmt(l.tokens)} tok`, c: color, a: Math.min(1, p * 5) })
+}
+
+function burst(n, color, p, l, tags) {
+  ctx.globalCompositeOperation = 'lighter'
+  glow(n.x, n.y, n.r * 2.4, color, 0.9 * Math.max(0, 1 - p * 2.5))
+  ctx.globalCompositeOperation = 'source-over'
+  for (const [lag, w, col] of [[0, 3, color], [0.14, 1.5, '#FFFFFF']]) {
+    const q = Math.max(0, p - lag)
+    if (q <= 0) continue
+    ctx.beginPath(); ctx.arc(n.x, n.y, n.r + 4 + q * 46, 0, Math.PI * 2)
+    ctx.lineWidth = w; ctx.strokeStyle = col === '#FFFFFF' ? `rgba(255,255,255,${0.8 * (1 - q) ** 2})` : rgba(col, (1 - q) ** 2)
+    ctx.shadowColor = col; ctx.shadowBlur = 14; ctx.stroke(); ctx.shadowBlur = 0
+  }
+  tags.push({ x: n.x + n.r + 14, y: n.y - n.r - 6 - p * 30, s: `+${fmt(l.tokens)} tok`, c: color, a: 1 - p * p })
+}
+
+// ---------- timeline view ----------
+let lanes = []
+let ticks = []
+let dots = []
+
+function niceStep(spanMs, px) {
+  const steps = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600].map(s => s * 1000)
+  for (const s of steps) if ((s / spanMs) * px >= 90) return s
+  return 3600000
+}
+
+function drawTimeline(g, t) {
+  const top = topOffset() + 10
+  const LEFT = Math.min(240, Math.max(150, W * 0.2))
+  const RIGHT = 28
+  const order = shownOrder(g, t, 'timeline')
+  const t0 = Math.min(...order.map(({ id }) => g.agents[id]?.startedAt ?? t), t - 5000)
+  const t1 = t + Math.max(2000, (t - t0) * 0.04)
+  const span = Math.max(5000, t1 - t0)
+  const plotW = Math.max(50, W - LEFT - RIGHT)
+  const X = ms => LEFT + ((ms - t0) / span) * plotW
+  const laneH = Math.max(32, Math.min(78, (H - top - 50) / Math.max(1, order.length)))
+  lanes = []; ticks = []; dots = []
+
+  ctx.fillStyle = 'rgba(10,6,20,0.72)'
+  ctx.fillRect(0, top - 18, W, order.length * laneH + 44)
+
+  const step = niceStep(span, plotW)
+  ctx.font = `500 11px ${numFont}`
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top'
+  for (let s = 0; t0 + s <= t1; s += step) {
+    const x = X(t0 + s)
+    ctx.fillStyle = 'rgba(145,136,188,0.12)'
+    ctx.fillRect(x, top - 6, 1, order.length * laneH + 6)
+    ctx.fillStyle = '#5b5285'
+    ctx.fillText(mmss(s), x, top + order.length * laneH + 6)
+  }
+
+  let peak = 1
+  const rates = {}
+  for (const { id } of order) {
+    const a = g.agents[id]
+    const r = (burn[id] || []).filter(p => p.t >= (a?.startedAt ?? 0) - 500)
+    rates[id] = r
+    for (const p of r) peak = Math.max(peak, p.v)
+  }
+
+  order.forEach(({ id, depth }, i) => {
+    const a = g.agents[id]; if (!a) return
+    const c = colorOf(a)
+    const y = top + i * laneH
+    const mid = y + laneH / 2
+    const start = a.startedAt ?? t0
+    const end = a.endedAt ?? (a.status === 'running' ? t : a.lastActiveAt ?? t)
+    const x0 = X(start), x1 = Math.max(X(end), x0 + 3)
+    const barH = Math.min(36, laneH - 14)
+    lanes.push({ id, y, h: laneH, x0, x1 })
+
+    if (selected === id) { ctx.fillStyle = 'rgba(0,229,255,0.05)'; ctx.fillRect(0, y, W, laneH) }
+
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
+    ctx.font = `600 14px ${displayFont}`
+    ctx.fillStyle = c
+    ctx.fillText(clip(a.label, 22), 16 + depth * 12, mid - 7)
+    ctx.font = `500 11px ${numFont}`
+    ctx.fillStyle = a.status === 'running' ? '#3dff8f' : a.status === 'error' ? '#ff3355' : '#9188bc'
+    const p = progressOf(a)
+    const st = a.status === 'running' ? 'running ' + dur(t - start) : a.status === 'done' || (id === MAIN && a.endedAt) ? 'done in ' + dur(end - start) : a.status
+    ctx.fillText(st + (p.total ? `  ${p.done}/${p.total}` : ''), 16 + depth * 12, mid + 9)
+
+    // the expected finish, as a ghost extension of a running bar
+    const e = a.status === 'running' ? usual(id === MAIN ? MAIN_TURN : a.type) : null
+    if (e && start + e.median > t) {
+      ctx.save(); ctx.setLineDash([3, 4]); ctx.strokeStyle = rgba(c, 0.45); ctx.lineWidth = 1
+      ctx.strokeRect(x1, mid - barH / 2, Math.max(2, X(start + e.median) - x1), barH)
+      ctx.restore()
+    }
+
+    ctx.fillStyle = rgba(c, a.status === 'running' ? 0.16 : 0.10)
+    ctx.fillRect(x0, mid - barH / 2, x1 - x0, barH)
+    ctx.strokeStyle = rgba(c, a.status === 'running' ? 0.8 : 0.45); ctx.lineWidth = 1.2
+    ctx.strokeRect(x0 + 0.5, mid - barH / 2 + 0.5, x1 - x0 - 1, barH - 1)
+
+    const r = rates[id]
+    if (r.length > 1) {
+      ctx.save()
+      ctx.beginPath(); ctx.rect(x0, mid - barH / 2, x1 - x0, barH); ctx.clip()
+      const base = mid + barH / 2 - 6
+      const Y = v => base - (v / peak) * (barH - 9)
+      ctx.beginPath()
+      ctx.moveTo(X(r[0].t), base)
+      for (const q of r) ctx.lineTo(X(q.t), Y(q.v))
+      ctx.lineTo(X(r[r.length - 1].t), base)
+      ctx.closePath()
+      ctx.fillStyle = rgba(c, 0.30); ctx.fill()
+      ctx.beginPath()
+      r.forEach((q, k) => (k ? ctx.lineTo(X(q.t), Y(q.v)) : ctx.moveTo(X(q.t), Y(q.v))))
+      ctx.strokeStyle = rgba(c, 0.95); ctx.lineWidth = 1.4; ctx.stroke()
+      ctx.restore()
+    }
+
+    for (const tl of a.toolLog || []) {
+      const tx0 = X(tl.at), tx1 = Math.max(tx0 + 3, X(tl.end ?? t) - 1.5)
+      const ty = mid + barH / 2 - 4
+      ctx.fillStyle = tl.end === undefined ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.45)'
+      ctx.fillRect(tx0, ty, tx1 - tx0, 2)
+      ctx.fillStyle = 'rgba(255,255,255,0.9)'
+      ctx.fillRect(tx0, ty - 4, 1.5, 6)
+      ticks.push({ id, x0: tx0 - 2, x1: tx1 + 2, y0: ty - 7, y1: ty + 5, tool: tl })
+    }
+
+    if (a.status === 'running') {
+      ctx.globalCompositeOperation = 'lighter'
+      glow(x1, mid, REDUCED ? 10 : 10 + 3 * Math.sin(t / 220), c, 0.9)
+      ctx.globalCompositeOperation = 'source-over'
+    }
+  })
+
+  const laneOf = {}
+  for (const l of lanes) laneOf[l.id] = l
+  for (const l of g.links) {
+    const A = laneOf[l.from], B = laneOf[l.to]
+    if (!A || !B) continue
+    const x = X(l.at)
+    const ya = A.y + A.h / 2, yb = B.y + B.h / 2
+    const c = l.kind === 'message' ? '#FF2E88' : g.agents[l.from] ? colorOf(g.agents[l.from]) : '#fff'
+    ctx.save()
+    if (l.kind === 'message') ctx.setLineDash([3, 4])
+    ctx.strokeStyle = rgba(c, 0.6); ctx.lineWidth = 1.2
+    ctx.beginPath(); ctx.moveTo(x, ya); ctx.lineTo(x, yb); ctx.stroke()
+    ctx.restore()
+    ctx.fillStyle = c
+    ctx.save(); ctx.translate(x, yb); ctx.rotate(Math.PI / 4); ctx.fillRect(-3.5, -3.5, 7, 7); ctx.restore()
+    dots.push({ x, y: yb, link: l })
+    const fresh = t - l.at
+    if (fresh >= 0 && fresh < 1200 && !REDUCED) {
+      ctx.globalCompositeOperation = 'lighter'
+      glow(x, ya + (yb - ya) * Math.min(1, fresh / 500), 14, c, 1 - fresh / 1200)
+      ctx.globalCompositeOperation = 'source-over'
+    }
+  }
+
+  const xn = X(t)
+  ctx.save(); ctx.setLineDash([4, 5]); ctx.strokeStyle = 'rgba(0,229,255,0.5)'
+  ctx.beginPath(); ctx.moveTo(xn, top - 10); ctx.lineTo(xn, top + order.length * laneH); ctx.stroke(); ctx.restore()
+  ctx.font = `600 11px ${numFont}`; ctx.fillStyle = '#00e5ff'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
+  ctx.fillText('now', xn, top - 12)
+}
+
+// ---------- frame ----------
+let frameDt = 16
+function frame(now) {
+  requestAnimationFrame(frame)
+  frameDt = Math.min(64, now - lastFrame)
+  lastFrame = now
+  if (!W) return
+  const t = Date.now()
+  const g = graph
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0)
+  ctx.drawImage(backdrop, 0, 0, W, H)
+  const m0 = g && g.agents[MAIN]
+  $('empty').classList.toggle('show', !g || (g.order.length <= 1 && g.links.length === 0 && !(m0 && (m0.steps || m0.status === 'running'))))
+  updateConn(t)
+  if (!g) return
+  if (view === 'map') drawMap(g, t)
+  else drawTimeline(g, t)
+}
+
+function updateConn(t) {
+  const el = $('conn')
+  const fresh = t - lastPush < 3000
+  el.className = 'conn ' + (DEMO ? 'demo' : fresh ? 'live' : '')
+  const text = DEMO ? 'Demo' : fresh ? 'Live' : lastPush ? 'No updates' : 'Waiting'
+  if (el.lastChild.textContent !== text) el.lastChild.textContent = text
+}
+
+// ---------- the mission plate ----------
+let lastState = null
+let bellOn = false
+let audio = null
+
+function renderMission(g, now) {
+  const M = mission(g, now)
+  const plate = $('plate')
+  const word = { running: 'RUNNING', done: 'DONE', failed: 'DONE', idle: 'STANDBY' }[M.state]
+  let html = ''
+  const counts = `<div class="counts">
+    <div><b>${M.running.filter(a => a.id !== MAIN).length}</b><span>running</span></div>
+    <div><b>${M.done.length}</b><span>finished</span></div>
+    <div><b>${M.failed.length}</b><span>failed</span></div>
+    <div><b>${fmt(g.order.reduce((s, id) => s + (g.agents[id] ? g.agents[id].outTok + (g.agents[id].liveOut || 0) : 0), 0))}</b><span>tokens written</span></div>
+  </div>`
+  if (M.state === 'running') {
+    const e = etaOf(M.m && M.m.status === 'running' ? M.m : M.running[0], now)
+    const planLine = M.plan.total ? `<p class="step"><b>${M.plan.done} of ${M.plan.total} steps done</b>${M.plan.current ? '. Now: ' + esc(M.plan.current) : ''}</p>` : ''
+    const frac = M.plan.total ? M.plan.done / M.plan.total : e && e.frac !== null ? e.frac : null
+    const subs = M.running.filter(a => a.id !== MAIN)
+    // the run ends when its slowest agent does: name the one expected last
+    let last = null
+    for (const a of subs) {
+      const u = usual(a.type)
+      if (!u) continue
+      const left = u.median - (now - a.startedAt)
+      if (!last || left > last.left) last = { a, left }
+    }
+    html = `<div class="state"><span class="word">${word}</span><span class="clockv">${mmss(now - M.turnStart)}</span></div>
+      ${planLine}
+      ${frac !== null ? `<div class="bar${M.plan.total ? '' : ' est'}"><i style="width:${Math.round(Math.min(1, frac) * 100)}%"></i></div>` : ''}
+      <p class="line soft">${e && e.text ? e.text : 'Started ' + clock(M.turnStart)}</p>
+      ${last ? `<p class="line soft">Waiting longest on <b style="color:${colorOf(last.a)}">${esc(last.a.label)}</b>: ${last.left > 0 ? 'about ' + dur(last.left) + ' left' : 'past its usual time'}</p>` : ''}
+      ${counts}`
+  } else if (M.state === 'done' || M.state === 'failed') {
+    const took = M.m.endedAt - M.turnStart
+    html = `<div class="state"><span class="word">${word}</span><span class="clockv">${clock(M.m.endedAt)}</span></div>
+      <p class="line">Finished after ${dur(took)}. Claude is waiting for you.</p>
+      ${M.failed.length ? `<p class="line soft" style="color:#ffb3c2">${M.failed.length} agent${M.failed.length > 1 ? 's' : ''} failed: ${M.failed.map(a => esc(a.label)).join(', ')}</p>` : ''}
+      ${M.plan.total ? `<p class="line soft">${M.plan.done} of ${M.plan.total} planned steps done</p>` : ''}
+      ${counts}`
+  } else {
+    html = `<div class="state"><span class="word">${word}</span></div>
+      <p class="line soft">Nothing running. Give Claude a task and the run shows up here: how far along it is and when it should be done.</p>`
+  }
+  plate.className = 'plate chamfer ' + M.state + (plate.classList.contains('flash') ? ' flash' : '')
+  setHtml($('plate-in'), html)
+
+  if (lastState === 'running' && (M.state === 'done' || M.state === 'failed')) finished(M)
+  lastState = M.state
+  const am = active && (metas[active] || sessionList.find(x => x.id === active))
+  const name = am && am.project ? am.project + ' · AGENT//FLOW' : 'AGENT//FLOW'
+  const want = M.state === 'running' ? `▶ ${mmss(now - M.turnStart)} · ${name}` : M.state === 'done' ? `✓ Done · ${name}` : M.state === 'failed' ? `! Done with failures · ${name}` : name
+  if (document.title !== want) document.title = want
+}
+
+function finished(M) {
+  const plate = $('plate')
+  plate.classList.remove('flash'); void plate.offsetWidth; plate.classList.add('flash')
+  setTimeout(() => plate.classList.remove('flash'), 1200)
+  chime()
+  try {
+    if (bellOn && 'Notification' in window && Notification.permission === 'granted' && document.hidden)
+      new Notification('Claude Code is done', { body: M.failed.length ? `${M.failed.length} agent(s) failed` : 'The run finished; Claude is waiting for you.' })
+  } catch {}
+}
+function chime() {
+  if (!bellOn) return
+  try {
+    if (audio) {
+      const t = audio.currentTime
+      for (const [f, d] of [[880, 0], [1320, 0.12]]) {
+        const o = audio.createOscillator(), gn = audio.createGain()
+        o.type = 'square'; o.frequency.value = f
+        gn.gain.setValueAtTime(0.0001, t + d); gn.gain.exponentialRampToValueAtTime(0.08, t + d + 0.02); gn.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.25)
+        o.connect(gn).connect(audio.destination); o.start(t + d); o.stop(t + d + 0.3)
+      }
+    }
+  } catch {}
+}
+$('bell').addEventListener('click', () => {
+  bellOn = !bellOn
+  $('bell').setAttribute('aria-pressed', String(bellOn))
+  try { localStorage.setItem('agent-flow-bell', bellOn ? '1' : '') } catch {}
+  if (bellOn) {
+    try { audio = audio || new (window.AudioContext || window.webkitAudioContext)() ; audio.resume() } catch {}
+    try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission() } catch {}
+  }
+})
+
+// ---------- side rail ----------
+let renderedLinks = 0
+const openEntries = new Set()
+
+function renderRail() {
+  const g = graph
+  if (!g) return
+  const now = Date.now()
+  renderMission(g, now)
+  renderTabs()
+
+  const items = attentionItems(g, now)
+  setHtml($('attention'), items.map(it => `<button type="button" class="${it.kind} chamfer" data-id="${esc(it.id)}"><i></i>${esc(it.text)}</button>`).join(''))
+
+  const order = shownOrder(g, now, 'map')
+  const hidden = hiddenCount(g, now)
+  const rows = order.map(({ id, depth }) => {
+    const a = g.agents[id]
+    if (!a) return ''
+    return `<li><button type="button" data-id="${esc(id)}" aria-pressed="${selected === id}" style="padding-left:${8 + depth * 14}px">
+      <span class="dot" style="background:${colorOf(a)};box-shadow:0 0 8px ${colorOf(a)}"></span>
+      <span class="who">${esc(a.label)}<small>${esc(a.id === MAIN ? 'orchestrator' : a.type)}</small></span>
+      <span class="st"></span></button></li>`
+  }).join('')
+  setHtml($('agents'), rows + (hidden || showDone ? `<li><button type="button" class="more" data-done="1">${showDone ? 'Hide finished agents' : `Show ${hidden} finished agent${hidden > 1 ? 's' : ''}`}</button></li>` : ''))
+  const chip = $('donechip')
+  const label = showDone ? 'Hide finished agents' : `✓ ${hidden} finished agent${hidden > 1 ? 's' : ''} off the map. Show`
+  chip.hidden = !(hidden || showDone)
+  if (chip.textContent !== label) chip.textContent = label
+  for (const b of $('agents').querySelectorAll('button[data-id]')) {
+    const a = g.agents[b.dataset.id]; if (!a) continue
+    const p = progressOf(a)
+    const st = a.status === 'running' ? (p.total ? `${p.done}/${p.total}` : a.tps > 0 ? Math.round(a.tps) + ' tok/s' : 'working') : a.id === MAIN && a.status === 'idle' && a.endedAt ? 'waiting for you' : a.status === 'error' ? 'failed' : a.status
+    const span = b.lastElementChild
+    if (span.textContent !== st) span.textContent = st
+    const cls = 'st ' + a.status
+    if (span.className !== cls) span.className = cls
+  }
+
+  if (!g.agents[selected]) selected = MAIN
+  renderAgent(g, g.agents[selected], now)
+  renderWire(g, now)
+}
+
+function renderAgent(g, a, now) {
+  if (!a) return
+  const c = colorOf(a)
+  const el = $('agent')
+  if (!el.querySelector('#agent-h')) el.innerHTML = '<div id="agent-h"></div><div id="agent-b" role="tabpanel"></div>'
+  const head = `<div class="agent-head"><h3 style="color:${c}">${esc(a.label)}</h3>
+    <p>${esc(a.id === MAIN ? 'The orchestrator: talks to you, plans, hands out work' : a.type + (a.parent && a.parent !== MAIN && g.agents[a.parent] ? ', started by ' + g.agents[a.parent].label : ''))}</p></div>
+    <div class="tabs" role="tablist" aria-label="About ${esc(a.label)}">
+      ${[['overview', 'Overview'], ['context', 'Context'], ['packets', 'Packets']].map(([k, n]) =>
+        `<button type="button" role="tab" class="chamfer" data-tab="${k}" aria-selected="${tab === k}">${n}</button>`).join('')}
+    </div>`
+  setHtml($('agent-h'), head)
+  const bodyEl = $('agent-b')
+  bodyEl.style.setProperty('--tone', c)
+  const body = tab === 'context' ? contextTab(g, a, now) : tab === 'packets' ? packetsTab(g, a, now) : overviewTab(g, a, now)
+  const list = bodyEl.querySelector('.entries')
+  const keepScroll = list ? list.scrollTop : null
+  const atBottom = list ? list.scrollHeight - list.scrollTop - list.clientHeight < 8 : true
+  if (setHtml(bodyEl, body)) {
+    const fresh = bodyEl.querySelector('.entries')
+    if (fresh) fresh.scrollTop = atBottom ? fresh.scrollHeight : keepScroll
+  }
+}
+
+function overviewTab(g, a, now) {
+  const running = a.status === 'running'
+  const p = progressOf(a)
+  const e = etaOf(a, now)
+  const nowLine = a.activity ? 'Now: ' + esc(a.activity)
+    : running ? (p.current ? esc(p.current) : a.tps > 0 ? 'Writing its answer' : 'Thinking about its next step')
+    : a.status === 'done' ? 'Finished and reported back'
+    : a.status === 'error' ? 'Stopped with an error'
+    : a.id === MAIN && a.endedAt ? 'Done with its turn. Waiting for you' : 'Waiting for you'
+  let eta = ''
+  if (running && e) {
+    eta = `<div class="eta">${e.text ? `<p>${e.text}</p>` : ''}${e.frac !== null ? `<div class="bar${e.estimate ? ' est' : ''}" style="--tone:var(--yellow)"><i style="width:${Math.round(e.frac * 100)}%;background:var(--yellow)"></i></div>` : ''}</div>`
+  }
+  const todos = (a.todos || []).map(t => `<li class="${t.status}">${esc(t.status === 'in_progress' && t.active ? t.active : t.text)}</li>`).join('')
+  const tools = (a.toolLog || []).slice(-8).reverse().map(tl =>
+    `<li class="${tl.end === undefined ? 'open' : ''}"><span title="${esc(tl.text)}">${esc(tl.text)}</span><span>${tl.end === undefined ? 'running ' + dur(now - tl.at) : dur(tl.end - tl.at)}</span></li>`).join('')
+  const end = a.endedAt
+  return `<p class="now">${nowLine}</p>${eta}
+    ${todos ? `<h4>Its plan, ${p.done} of ${p.total} done</h4><ul class="todos">${todos}</ul>` : ''}
+    <h4>Timing and tokens</h4>
+    <dl class="facts">
+      ${a.id === MAIN ? '' : `<dt>Asked to</dt><dd class="text">${esc(a.role)}</dd>`}
+      <dt>Started</dt><dd>${a.startedAt ? clock(a.startedAt) : '—'}</dd>
+      ${end ? `<dt>Finished</dt><dd>${clock(end)} <span class="soft">after ${dur(end - a.startedAt)}</span></dd>`
+            : running ? `<dt>Running for</dt><dd>${dur(now - a.startedAt)}</dd>` : ''}
+      ${a.lastActiveAt ? `<dt>Last activity</dt><dd>${ago(now - a.lastActiveAt)}</dd>` : ''}
+      <dt>Model</dt><dd>${esc(a.model || '—')}</dd>
+      ${a.ctxTok ? `<dt>Context</dt><dd>${fmt(a.ctxTok)} tokens in its last request</dd>` : ''}
+      <dt>Tokens read</dt><dd>${fmt(a.inTok)} <span class="soft">(${fmt(a.cacheTok)} from cache)</span></dd>
+      <dt>Tokens written</dt><dd>${fmt(a.outTok + Math.round(a.liveOut || 0))}</dd>
+      <dt>Speed</dt><dd>${running && a.tps > 0 ? Math.round(a.tps) + ' tok/s now, ' : ''}peak ${Math.round(a.peakTps || 0)} tok/s</dd>
+      <dt>Requests</dt><dd>${a.steps}</dd>
+      <dt>Tool calls</dt><dd>${a.tools}</dd>
+    </dl>
+    ${tools ? `<h4>Recent tool calls</h4><ul class="tools">${tools}</ul>` : ''}
+    ${a.result ? `<h4>What it reported</h4><p class="quote">${esc(a.result)}</p>` : ''}`
+}
+
+function contextTab(g, a, now) {
+  const snap = contexts.agents[a.id]
+  const isMain = a.id === MAIN
+  const total = (snap && snap.ctxTok) || a.ctxTok || 0
+  const mc = isMain ? contexts.main : null
+  let segs = []
+  if (mc && mc.categories && mc.categories.length) {
+    const pal = ['#B48CFF', '#00E5FF', '#F3E600', '#3DFF8F', '#FF8A00', '#FF2E88', '#7FE7FF']
+    let k = 0
+    segs = mc.categories.filter(c => c.kind === 'used' && c.tokens > 0).map(c => ({ name: c.name, tok: c.tokens, color: pal[k++ % pal.length] }))
+  } else if (snap) {
+    const parts = snap.parts || {}
+    const sum = Object.values(parts).reduce((s, v) => s + v, 0)
+    if (total > sum) segs.push({ name: 'System prompt and tool definitions', tok: total - sum, color: '#5B5285', est: true })
+    for (const k of ['prompt', 'user', 'reply', 'call', 'result', 'error']) if (parts[k]) segs.push({ name: KIND_NAME[k], tok: parts[k], color: KIND_COLOR[k] })
+  }
+  const sumSegs = segs.reduce((s, x) => s + x.tok, 0) || 1
+  const head = mc && mc.window
+    ? `<p class="ctx-sum"><b>${fmt(mc.tokens || total)}</b> of ${fmt(mc.window)} tokens in its window${mc.percent !== undefined ? `, <b>${mc.percent}%</b> full` : ''}</p>`
+    : total ? `<p class="ctx-sum">Its last request carried <b>${fmt(total)}</b> tokens of context</p>` : ''
+  const bar = segs.length ? `<div class="stack">${segs.map(s => `<i style="flex:${s.tok / sumSegs};background:${s.color}" title="${esc(s.name)}: ${fmt(s.tok)}"></i>`).join('')}</div>
+    <ul class="legend">${segs.map(s => `<li class="${s.est ? 'est' : ''}"><i style="background:${s.color}"></i><span>${esc(s.name)}</span><span>${fmt(s.tok)}</span></li>`).join('')}</ul>` : ''
+  if (!snap) {
+    return head + bar + `<p class="note">${a.status === 'running' || isMain ? 'Its transcript shows up here after its next request.' : 'No transcript was read for this agent.'} The page reads each agent's conversation from Claude Code: the task it was handed, what it wrote, every tool call and what came back.</p>`
+  }
+  const rows = snap.entries.map((x, i) => {
+    const key = a.id + ':' + i + ':' + x.title
+    return `<li><details data-key="${esc(key)}"${openEntries.has(key) ? ' open' : ''}><summary><i style="background:${KIND_COLOR[x.kind]}"></i><span title="${esc(x.title)}">${esc(x.title)}</span><span>${fmt(x.tok)}</span></summary><pre>${esc(x.preview)}</pre></details></li>`
+  })
+  if (snap.skipped) rows.splice(1, 0, `<li class="skipped">${snap.skipped} earlier entries not shown</li>`)
+  return head + bar +
+    `<h4>What is in it, oldest first (${snap.msgs} messages)</h4>
+    <ul class="entries">${rows.join('')}</ul>
+    <p class="note">Read ${ago(now - snap.at)}. Token counts per entry are estimates (characters ÷ 4).${snap.denied ? ' Its transcript can no longer be read; this is the last copy.' : ''}</p>`
+}
+
+function packetsTab(g, a, now) {
+  const mine = g.links.filter(l => l.from === a.id || l.to === a.id).slice().reverse()
+  if (!mine.length) return '<p class="wire-empty">Nothing has gone in or out of this agent yet.</p>'
+  return `<ul class="wire">${mine.map(l => wireItem(g, l, now)).join('')}</ul>`
+}
+
+function wireItem(g, l, now) {
+  const f = g.agents[l.from], to = g.agents[l.to]
+  const fc = f ? colorOf(f) : '#fff', tc = to ? colorOf(to) : '#fff'
+  return `<li><button type="button" data-link="${l.id}"><div class="route"><span style="color:${fc}">${esc(f ? f.label : l.from)}</span><span class="arrow">→</span><span style="color:${tc}">${esc(to ? to.label : l.to)}</span>
+    <span class="kind ${l.kind}">${PACKET_NAME[l.kind]}</span><span class="meta">${fmt(l.tokens)} tok, ${ago(now - l.at)}</span></div><p>${esc(l.text)}</p></button></li>`
+}
+
+function renderWire(g, now) {
+  const wire = $('wire')
+  const links = g.links.slice(-40).reverse()
+  if (!links.length) {
+    setHtml(wire, '<p class="wire-empty">Nothing has been handed off yet.</p>')
+    renderedLinks = 0
+    return
+  }
+  if (setHtml(wire, links.map(l => wireItem(g, l, now)).join(''))) {
+    const newest = links[0].id
+    if (newest > renderedLinks && renderedLinks !== 0) wire.firstElementChild.classList.add('fresh')
+    renderedLinks = newest
+  }
+}
+
+// ---------- packet inspector ----------
+let openPacket = null
+function openDrawer(id) { openPacket = id; renderDrawer(); $('drawer').querySelector('.close')?.focus() }
+function closeDrawer() { openPacket = null; $('drawer').classList.remove('open'); $('drawer').dataset.html = '' }
+function renderDrawer() {
+  const g = graph
+  const d = $('drawer')
+  if (!g || openPacket === null) return
+  const link = g.links.find(l => l.id === openPacket)
+  const full = packets.get(openPacket)
+  const p = full || link
+  if (!p) return closeDrawer()
+  const f = g.agents[p.from], to = g.agents[p.to]
+  const meta = full ? Object.entries(full.meta || {}).map(([k, v]) => `<dt>${esc(k)}</dt><dd${typeof v === 'string' && v.length > 24 ? ' class="text"' : ''}>${esc(v === true ? 'yes' : v === false ? 'no' : typeof v === 'number' ? (v >= 1000 ? fmt(v) : v) : v)}</dd>`).join('') : ''
+  const bodyText = full ? full.body : (link ? link.text : '')
+  const what = { spawn: 'The prompt the subagent starts from. It sees nothing of the parent\'s conversation but this.', report: 'The final answer the subagent handed back. This is all its parent learns of its work.', message: 'Sent with SendMessage between two running agents.' }[p.kind]
+  const html = `<header><div class="row"><span class="kind ${p.kind}">${PACKET_NAME[p.kind]}</span><button type="button" class="close chamfer">Close</button></div>
+      <h2 id="d-title"><span style="color:${f ? colorOf(f) : '#fff'}">${esc(f ? f.label : p.from)}</span><span class="arrow">→</span><span style="color:${to ? colorOf(to) : '#fff'}">${esc(to ? to.label : p.to)}</span></h2>
+      <p class="sub">${clock(p.at)}, about ${fmt(p.tokens)} tokens</p></header>
+    <div class="scroll">
+      <p class="note" style="margin:0 0 14px">${what}</p>
+      ${meta ? `<dl class="facts">${meta}</dl>` : ''}
+      <div class="bodyhead"><h3>${p.kind === 'report' ? 'The report' : p.kind === 'spawn' ? 'The prompt' : 'The message'}</h3><button type="button" class="copy chamfer">Copy</button></div>
+      <pre>${esc(bodyText)}</pre>
+      ${full && full.truncated ? '<p class="note">Cut at 24,000 characters.</p>' : ''}
+      ${!full ? '<p class="note">Only the opening was kept for this packet: it was sent before this page started reading.</p>' : ''}
+    </div>`
+  setHtml(d, html)
+  d.classList.add('open')
+}
+$('drawer').addEventListener('click', e => {
+  if (e.target.closest('.close')) closeDrawer()
+  if (e.target.closest('.copy')) {
+    const pre = $('drawer').querySelector('pre')
+    try { navigator.clipboard.writeText(pre.textContent); e.target.textContent = 'Copied' } catch {}
+  }
+})
+addEventListener('keydown', e => { if (e.key === 'Escape' && openPacket !== null) closeDrawer() })
+
+// ---------- interaction ----------
+function select(id) {
+  if (!id || !graph || !graph.agents[id]) return
+  selected = id
+  renderRail()
+}
+/**
+ * The rail redraws as numbers tick, which can swap a button out between mouse down and up and
+ * swallow the click. A mouse acts on press; touch and keyboard act on click as usual.
+ */
+function onPick(el, fn) {
+  el.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse' && e.button === 0 && fn(e.target)) e.preventDefault() })
+  el.addEventListener('click', e => { if (e.pointerType !== 'mouse' && !(e.detail > 0 && matchMedia('(pointer: fine)').matches)) fn(e.target) })
+}
+onPick($('tabs'), t => { const b = t.closest('button[data-sid]'); if (b) openSession(b.dataset.sid); return !!b })
+onPick($('agents'), t => {
+  if (t.closest('button[data-done]')) { toggleDone(); return true }
+  const b = t.closest('button[data-id]'); if (b) select(b.dataset.id); return !!b
+})
+$('donechip').addEventListener('click', toggleDone)
+onPick($('attention'), t => { const b = t.closest('button[data-id]'); if (b) select(b.dataset.id); return !!b })
+onPick($('agent'), target => {
+  const t = target.closest('button[data-tab]')
+  if (t) { tab = t.dataset.tab; try { localStorage.setItem('agent-flow-tab', tab) } catch {}; renderRail(); return true }
+  const l = target.closest('button[data-link]')
+  if (l) { openDrawer(Number(l.dataset.link)); return true }
+  return false
+})
+$('agent').addEventListener('toggle', e => {
+  const d = e.target
+  if (!d.dataset || !d.dataset.key) return
+  if (d.open) openEntries.add(d.dataset.key); else openEntries.delete(d.dataset.key)
+  // the panel's cached html must learn the new open state, or the next render reverts it
+  $('agent-b').dataset.html = ''
+}, true)
+onPick($('wire'), t => { const l = t.closest('button[data-link]'); if (l) openDrawer(Number(l.dataset.link)); return !!l })
+document.querySelector('.views').addEventListener('click', e => {
+  const b = e.target.closest('button[data-view]'); if (!b) return
+  view = b.dataset.view
+  for (const x of document.querySelectorAll('.views button')) x.setAttribute('aria-pressed', String(x === b))
+  try { localStorage.setItem('agent-flow-view', view) } catch {}
+})
+try {
+  const v = localStorage.getItem('agent-flow-view')
+  if (v === 'timeline' || v === 'map') { view = v; for (const x of document.querySelectorAll('.views button')) x.setAttribute('aria-pressed', String(x.dataset.view === v)) }
+  const tb = localStorage.getItem('agent-flow-tab'); if (tb === 'overview' || tb === 'context' || tb === 'packets') tab = tb
+  if (localStorage.getItem('agent-flow-bell')) { bellOn = true; $('bell').setAttribute('aria-pressed', 'true') }
+  if (localStorage.getItem('agent-flow-done')) showDone = true
+} catch {}
+addEventListener('pointerdown', () => { if (bellOn && !audio) try { audio = new (window.AudioContext || window.webkitAudioContext)() } catch {} }, { once: true })
+
+// ---------- dragging orbs: a layout of your own, kept per session ----------
+let pins = {} // agent id -> where it was dropped, as fractions of the map's size
+let drag = null
+const pinKey = () => 'agent-flow-pins:' + (active || 'none')
+function loadPins() { try { pins = JSON.parse(localStorage.getItem(pinKey()) || '{}') || {} } catch { pins = {} } }
+function savePins() { try { localStorage.setItem(pinKey(), JSON.stringify(pins)) } catch {} ; $('resetpins').hidden = !Object.keys(pins).length }
+$('resetpins').addEventListener('click', () => { pins = {}; savePins() })
+
+function pointAt(e) {
+  const r = canvas.getBoundingClientRect()
+  return { x: e.clientX - r.left, y: e.clientY - r.top }
+}
+function hit(p) {
+  if (view === 'map') {
+    for (const id of Object.keys(nodes)) { const n = nodes[id]; if (Math.hypot(p.x - n.x, p.y - n.y) <= n.r + 12) return { id } }
+    return null
+  }
+  for (const d of dots) if (Math.hypot(p.x - d.x, p.y - d.y) <= 7) return { link: d.link }
+  for (const tk of ticks) if (p.x >= tk.x0 && p.x <= tk.x1 && p.y >= tk.y0 && p.y <= tk.y1) return { id: tk.id, tool: tk.tool }
+  for (const l of lanes) if (p.y >= l.y && p.y < l.y + l.h) return { id: l.id }
+  return null
+}
+canvas.addEventListener('pointerdown', e => {
+  if (view !== 'map' || e.button !== 0) return
+  const p = pointAt(e)
+  const h = hit(p)
+  if (!h || !h.id || !nodes[h.id]) return
+  drag = { id: h.id, ox: nodes[h.id].x - p.x, oy: nodes[h.id].y - p.y, startX: p.x, startY: p.y, moved: false }
+  try { canvas.setPointerCapture(e.pointerId) } catch {}
+})
+canvas.addEventListener('pointerup', e => {
+  if (!drag) return
+  const d = drag
+  drag = null
+  canvas.classList.remove('dragging')
+  if (d.moved) savePins()
+  else select(d.id)
+})
+canvas.addEventListener('pointercancel', () => { drag = null; canvas.classList.remove('dragging') })
+const tip = $('tip')
+canvas.addEventListener('pointermove', e => {
+  const p = pointAt(e)
+  if (drag) {
+    if (!drag.moved && Math.hypot(p.x - drag.startX, p.y - drag.startY) > 4) { drag.moved = true; canvas.classList.add('dragging'); tip.style.display = 'none' }
+    if (drag.moved) {
+      const x = Math.max(30, Math.min(W - 30, p.x + drag.ox)), y = Math.max(60, Math.min(H - 60, p.y + drag.oy))
+      pins[drag.id] = { fx: x / W, fy: y / H }
+      if (nodes[drag.id]) { nodes[drag.id].x = x; nodes[drag.id].y = y }
+    }
+    return
+  }
+  const h = hit(p)
+  hoverId = h && h.id ? h.id : null
+  canvas.classList.toggle('pointing', !!h)
+  let html = ''
+  if (h && h.tool && graph) {
+    const a = graph.agents[h.id]
+    html = `<b>${esc(h.tool.text)}</b><span>${esc(a ? a.label : '')}, ${clock(h.tool.at)}, ${h.tool.end === undefined ? 'still running' : 'took ' + dur(h.tool.end - h.tool.at)}</span>`
+  } else if (h && h.link && graph) {
+    const l = h.link, f = graph.agents[l.from], to = graph.agents[l.to]
+    html = `<b>${PACKET_NAME[l.kind]}: ${esc(f ? f.label : l.from)} → ${esc(to ? to.label : l.to)}</b><span>${clock(l.at)}, ${fmt(l.tokens)} tok. Click to read it.</span>`
+  }
+  if (html) {
+    tip.innerHTML = html
+    tip.style.display = 'block'
+    tip.style.left = Math.min(p.x + 14, W - 350) + 'px'
+    tip.style.top = (p.y + 16) + 'px'
+  } else tip.style.display = 'none'
+})
+canvas.addEventListener('mouseleave', () => { hoverId = null; tip.style.display = 'none' })
+canvas.addEventListener('click', e => {
+  if (view === 'map') return // the map selects on pointer up, so a drag is not a click
+  const h = hit(pointAt(e))
+  if (!h) return
+  if (h.link) openDrawer(h.link.id)
+  else select(h.id)
+})
+
+// ---------- demo: a realistic run. Subagents never talk to each other here: each gets a task and reports back ----------
+// the demo plays three sessions: a big run, a small one that finishes while you watch the other, and a closed one
+const DEMO_SESSIONS = [
+  { id: 'demo-api', project: 'billing-api', cwd: '~/work/billing-api' },
+  { id: 'demo-af', project: 'agent-flow', cwd: '~/work/agent-flow' },
+  { id: 'demo-ct', project: 'notes-app', cwd: '~/work/notes-app' },
+]
+const demoFeed = {}
+function demoPublish(sid, project, g, pk, ctxPayload) {
+  demoFeed[sid] = { g, pk, ctx: ctxPayload }
+  const Mi = mission(g, Date.now())
+  noteMeta({ id: sid, project, lastSeen: Date.now(), state: Mi.state, running: Mi.running.filter(a => a.id !== MAIN).length, failed: Mi.failed.length, turnStart: Mi.turnStart, endedAt: Mi.m && Mi.m.endedAt })
+  if (active === sid) demoShow(sid)
+}
+function demoShow(sid) {
+  const f = demoFeed[sid]
+  if (!f) return
+  window.__AF_PUSH({ v: 2, now: Date.now(), graph: JSON.parse(JSON.stringify(f.g)), history: durations })
+  window.__AF_PACKETS({ rev: f.pk.length, items: f.pk })
+  if (f.ctx) window.__AF_CTX(f.ctx)
+}
+
+/** The small session: one Plan agent that reports back about 12s in, then the session waits for you. */
+function demoSmall() {
+  const sid = 'demo-af', t0 = Date.now()
+  const g = { agents: {}, order: [], links: [], seq: 0, opened: true, startedAt: t0 }
+  const blank = (id, label, type, role, color, parent) => { g.agents[id] = { id, label, type, role, task: '', parent, color, status: 'running', inTok: 0, outTok: 0, cacheTok: 0, steps: 1, tools: 0, liveOut: 0, tps: 0, peakTps: 0, startedAt: Date.now(), lastActiveAt: Date.now(), toolLog: [], model: 'claude-sonnet-5-5' }; g.order.push(id); return g.agents[id] }
+  const m = blank(MAIN, 'MAIN', 'orchestrator', 'Talks to you, plans, delegates', 0)
+  m.model = 'claude-opus-5-5'
+  const pk = []
+  const link = (from, to, kind, body) => { g.seq++; const l = { id: g.seq, from, to, kind, tokens: Math.ceil(body.length / 4), text: clip(body, 120), at: Date.now() }; g.links.push(l); pk.push({ ...l, body, truncated: false, meta: {} }) }
+  setTimeout(() => { const a = blank('p1', 'Plan #1', 'Plan', 'Plan the web tab view', 2, MAIN); link(MAIN, 'p1', 'spawn', 'Plan how the dashboard should show one tab per Claude Code session.') }, 1500)
+  setTimeout(() => { const a = g.agents.p1; a.status = 'done'; a.endedAt = Date.now(); a.tps = 0; a.result = 'One dashboard, a tab per session, data kept per session folder.'; link('p1', MAIN, 'report', a.result) }, 9000)
+  setTimeout(() => { m.status = 'idle'; m.endedAt = Date.now(); m.tps = 0 }, 12000)
+  const tick = setInterval(() => {
+    for (const id of g.order) { const a = g.agents[id]; if (a.status !== 'running') continue; a.tps = 90 + Math.random() * 120; a.peakTps = Math.max(a.peakTps, a.tps); a.liveOut += a.tps / 10; a.inTok += 700 }
+    demoPublish(sid, 'agent-flow', g, pk, null)
+    if (Date.now() - t0 > 45000) { clearInterval(tick); setTimeout(demoSmall, 500) }
+  }, 100)
+}
+
+function demoRun() {
+  const t0 = Date.now()
+  const g = { agents: {}, order: [], links: [], seq: 0, opened: true, startedAt: t0 }
+  const ctxA = {}
+  const pk = []
+  durations = {
+    Explore: [9000, 14000, 11000, 16000, 12500],
+    Plan: [12000, 15000, 10500],
+    'general-purpose': [14000, 18000, 13000],
+    [MAIN_TURN]: [22000, 26000, 19000, 24000],
+  }
+  const now = () => Date.now()
+  const agent = (id, label, type, role, color, parent) => {
+    g.agents[id] = { id, label, type, role, task: '', parent, color, status: 'idle', inTok: 0, outTok: 0, cacheTok: 0, steps: 0, tools: 0, liveOut: 0, tps: 0, peakTps: 0, startedAt: now(), lastActiveAt: now(), toolLog: [] }
+    g.order.push(id)
+    return g.agents[id]
+  }
+  const est = s => Math.ceil(s.length / 4)
+  const entry = (id, kind, title, text) => {
+    const c = ctxA[id] || (ctxA[id] = { at: now(), msgs: 0, parts: { prompt: 0, user: 0, reply: 0, call: 0, result: 0, error: 0 }, entries: [], skipped: 0 })
+    c.entries.push({ kind, title, tok: est(text), preview: text })
+    c.parts[kind] += est(text)
+    c.msgs = c.entries.length
+    c.at = now()
+    c.ctxTok = (g.agents[id] && g.agents[id].ctxTok) || undefined
+  }
+  const link = (from, to, kind, body, meta) => {
+    g.seq++
+    const l = { id: g.seq, from, to, kind, tokens: est(body), text: clip(body, 120), at: now() }
+    g.links.push(l)
+    pk.push({ ...l, body, truncated: false, meta })
+  }
+  const closeTool = id => { const a = g.agents[id]; for (const tl of a.toolLog) if (tl.end === undefined) tl.end = now(); a.activity = undefined }
+  const tool = (id, text, result) => {
+    const a = g.agents[id]; closeTool(id); a.tools++; a.activity = text; a.toolLog.push({ at: now(), text }); a.lastActiveAt = now()
+    entry(id, 'call', text, JSON.stringify({ call: text }))
+    if (result) setTimeout(() => entry(id, result.error ? 'error' : 'result', (result.error ? 'Error from ' : 'Result of ') + text, result.text), 500)
+  }
+  const todos = list => { g.agents[MAIN].todos = list.map(([text, status, active]) => ({ text, status, active })) }
+  const spawn = (id, label, type, role, color, parent, prompt, model) => {
+    const a = agent(id, label, type, role, color, parent)
+    a.task = clip(prompt, 160); a.status = 'running'; a.model = model
+    link(parent, id, 'spawn', prompt, { 'Agent type': type, 'Asked to': role, Model: model, "Parent's model": 'claude-opus-5-5', 'Runs in the background': false, 'Fork (inherits the parent context)': false })
+    entry(id, 'prompt', 'The task it was handed', prompt)
+    a.ctxTok = 14000 + est(prompt)
+    ctxA[id].ctxTok = a.ctxTok
+  }
+  const finish = (id, inT, outT, cache, text, failed) => {
+    const a = g.agents[id]; closeTool(id)
+    a.status = failed ? 'error' : 'done'; a.inTok += inT; a.outTok += outT; a.cacheTok += cache; a.steps += 3; a.endedAt = now(); a.lastActiveAt = now(); a.result = text; a.tps = 0
+    entry(id, 'reply', 'Wrote', text)
+    link(id, a.parent || MAIN, 'report', text, { Outcome: failed ? 'error' : 'answer', 'Ran for': Math.round((a.endedAt - a.startedAt) / 1000) + 's', 'Tokens read': Math.round(a.inTok), 'Tokens written': Math.round(a.outTok), Requests: a.steps, 'Tool calls': a.tools })
+  }
+  agent(MAIN, 'MAIN', 'orchestrator', 'Talks to you, plans, delegates', 0)
+  const m = g.agents[MAIN]
+  const S = []
+  const step = (ms, fn) => S.push([ms, fn])
+  const TASK_1 = 'Find where JWT tokens are issued, validated and refreshed across the services in this repository.\n\nReport: the files and functions involved, the order a request goes through them, and where the refresh endpoint lives. Do not change any code.'
+  const TASK_2 = 'Design a zero-downtime migration of the session store from Redis to Postgres.\n\nConstraints: no user may be logged out during the switch; the old store must stay readable for one release. Give the steps in order with a rollback for each.'
+  const TASK_3 = 'Write a k6 load test for the login flow at 2,000 requests per second.\n\nIt should ramp up over 2 minutes, hold for 10, refresh tokens every 10 minutes per virtual user, and fail if p95 latency goes over 120 ms. Put it in tests/login.k6.js.'
+  const TASK_4 = 'Find the CI job that runs the integration tests and tell me which environment variables it needs.'
+  const TASK_5 = 'Search the gateway Helm charts for every auth-related filter and say what each one does.'
+  step(0, () => { m.status = 'running'; m.model = 'claude-opus-5-5'; m.startedAt = now(); m.endedAt = undefined; m.ctxTok = 41000
+    entry(MAIN, 'user', 'You', 'Our login is slow under load and we want to move sessions to Postgres. Map the auth flow, plan the migration, and write a load test.')
+    tool(MAIN, 'Read the repository layout', { text: 'src/\n  auth/\n  gateway/\n  session/\ncharts/\ntests/\n.ci/' }) })
+  step(900, () => { closeTool(MAIN); todos([['Map the auth flow', 'in_progress', 'Mapping the auth flow'], ['Plan the session store migration', 'pending'], ['Write the load test', 'pending'], ['Check the CI setup', 'pending'], ['Summarize for you', 'pending']]); tool(MAIN, 'TodoWrite: 5 steps') })
+  step(1200, () => { closeTool(MAIN); tool(MAIN, 'Agent → Explore: Map the auth flow'); spawn('d1', 'Explore #1', 'Explore', 'Map the auth flow', 1, MAIN, TASK_1, 'claude-haiku-5-5') })
+  step(1700, () => tool('d1', 'Glob src/**/auth*', { text: 'src/auth/middleware.ts\nsrc/auth/token.ts\nsrc/auth/refresh.ts' }))
+  step(2400, () => { todos([['Map the auth flow', 'in_progress', 'Mapping the auth flow'], ['Plan the session store migration', 'in_progress', 'Planning the migration'], ['Write the load test', 'pending'], ['Check the CI setup', 'pending'], ['Summarize for you', 'pending']]); spawn('d2', 'Plan #1', 'Plan', 'Design storage migration', 2, MAIN, TASK_2, 'claude-sonnet-5-5') })
+  step(3000, () => tool('d1', 'Read src/auth/middleware.ts', { text: 'export async function authenticate(req) {\n  const token = req.headers.authorization?.slice(7)\n  const claims = await validateToken(token)\n  ...' }))
+  step(3200, () => tool('d2', 'Read docs/storage.md', { text: '# Session storage\nSessions live in Redis (cluster of 3), TTL 24h, key session:{id}...' }))
+  step(3600, () => spawn('d3', 'Explore #2', 'Explore', 'Check CI config', 4, MAIN, TASK_4, 'claude-haiku-5-5'))
+  step(4100, () => spawn('d4', 'tester', 'general-purpose', 'Write load test', 3, MAIN, TASK_3, 'claude-sonnet-5-5'))
+  step(4600, () => tool('d4', 'Read tests/README.md', { text: 'Tests run with `npm test`. Load tests live in tests/*.k6.js and run with k6.' }))
+  step(4800, () => tool('d3', 'Read .ci/pipeline.yml', { error: true, text: 'File does not exist: .ci/pipeline.yml' }))
+  step(5200, () => tool('d1', 'Grep "validateToken" src/', { text: 'src/auth/middleware.ts:12\nsrc/auth/token.ts:4\nsrc/gateway/filters.ts:31' }))
+  step(5800, () => tool('d2', 'Grep "SessionStore" src/', { text: 'src/session/store.ts:1: export class SessionStore\nsrc/session/redis.ts:8' }))
+  step(6000, () => spawn('d5', 'Explore #3', 'Explore', 'Scan gateway configs', 5, 'd1', TASK_5, 'claude-haiku-5-5'))
+  step(6500, () => tool('d5', 'Glob charts/gateway/**', { text: 'charts/gateway/values.yaml\ncharts/gateway/templates/filters.yaml' }))
+  step(7000, () => tool('d4', 'Write tests/login.k6.js', { text: 'File written (84 lines).' }))
+  step(7400, () => tool('d3', 'Glob .github/workflows/*', { text: 'No files found' }))
+  step(8200, () => finish('d3', 9000, 400, 8000, 'There is no CI configuration in this repository: neither .ci/pipeline.yml nor .github/workflows exists, so I could not find the integration test job.', true))
+  step(8400, () => tool('d5', 'Read charts/gateway/values.yaml', { text: 'filters:\n  - name: jwt-verify\n  - name: rate-limit-auth\n  - name: mtls-edge' }))
+  step(8800, () => tool('d2', 'Write plan.md', { text: 'File written.' }))
+  step(10200, () => tool('d4', 'Bash: k6 inspect tests/login.k6.js', { text: 'execution: local\nscenarios: login (ramping-vus)' }))
+  step(11000, () => finish('d5', 13000, 900, 12000, 'Three auth filters in the gateway chart: jwt-verify (checks the token signature and expiry), rate-limit-auth (20 login attempts per minute per IP), mtls-edge (client certificates for internal callers).'))
+  step(12800, () => { finish('d2', 54000, 5200, 52000, 'Migration plan:\n1. Dual-write: write sessions to Redis and Postgres.\n2. Shadow-read from Postgres and compare.\n3. Cut reads over per service behind a flag.\n4. Stop Redis writes after one release.\nEach step rolls back by flipping its flag.')
+    todos([['Map the auth flow', 'in_progress', 'Mapping the auth flow'], ['Plan the session store migration', 'completed'], ['Write the load test', 'in_progress', 'Writing the load test'], ['Check the CI setup', 'completed'], ['Summarize for you', 'pending']]) })
+  step(14800, () => { finish('d1', 39000, 2800, 38000, 'Auth flow: the gateway\'s jwt-verify filter, then authenticate() in src/auth/middleware.ts, then validateToken() in src/auth/token.ts, then the SessionStore. Refresh is POST /auth/refresh in src/auth/refresh.ts with a 15 minute TTL.')
+    todos([['Map the auth flow', 'completed'], ['Plan the session store migration', 'completed'], ['Write the load test', 'in_progress', 'Writing the load test'], ['Check the CI setup', 'completed'], ['Summarize for you', 'pending']]) })
+  step(16800, () => { finish('d4', 32000, 3100, 30000, 'Wrote tests/login.k6.js: ramps to 2,000 requests per second over 2 minutes, holds for 10, refreshes tokens every 10 minutes, and fails if p95 is over 120 ms.')
+    todos([['Map the auth flow', 'completed'], ['Plan the session store migration', 'completed'], ['Write the load test', 'completed'], ['Check the CI setup', 'completed'], ['Summarize for you', 'in_progress', 'Writing the summary']]) })
+  step(17200, () => { closeTool(MAIN); tool(MAIN, 'Writing the summary') })
+  step(21500, () => { closeTool(MAIN); m.status = 'idle'; m.endedAt = now(); m.inTok += 113000; m.outTok += 2300; m.tps = 0
+    todos([['Map the auth flow', 'completed'], ['Plan the session store migration', 'completed'], ['Write the load test', 'completed'], ['Check the CI setup', 'completed'], ['Summarize for you', 'completed']])
+    entry(MAIN, 'reply', 'Wrote', 'Here is what the agents found: the auth flow, a four-step migration plan, and a load test. The CI check failed: this repository has no CI configuration.') })
+  let i = 0
+  const tick = setInterval(() => {
+    const e = Date.now() - t0
+    while (i < S.length && S[i][0] <= e) S[i++][1]()
+    for (const id of g.order) {
+      const a = g.agents[id]
+      if (a.status !== 'running') continue
+      const target = id === MAIN ? 60 : 120 + (id.charCodeAt(1) * 37) % 220
+      a.tps += (target * (0.6 + Math.random() * 0.8) - a.tps) * 0.3
+      a.peakTps = Math.max(a.peakTps, a.tps)
+      a.liveOut += a.tps / 10
+      a.inTok += 900 + Math.random() * 500
+      a.ctxTok = (a.ctxTok || 14000) + 60
+      if (ctxA[id]) ctxA[id].ctxTok = a.ctxTok
+      a.lastActiveAt = Date.now()
+    }
+    demoPublish('demo-api', 'billing-api', g, pk, { rev: e, agents: JSON.parse(JSON.stringify(ctxA)), main: { window: 200000, tokens: m.ctxTok, percent: Math.round(m.ctxTok / 2000), at: Date.now(),
+      categories: [{ name: 'System prompt', tokens: 3100, kind: 'used' }, { name: 'System tools', tokens: 14800, kind: 'used' }, { name: 'MCP tools', tokens: 6200, kind: 'used' }, { name: 'Memory files', tokens: 2400, kind: 'used' }, { name: 'Skills', tokens: 1900, kind: 'used' }, { name: 'Messages', tokens: Math.max(1000, m.ctxTok - 28400), kind: 'used' }, { name: 'Free space', tokens: 200000 - m.ctxTok, kind: 'free' }] } })
+    if (e > 29000) { clearInterval(tick); if (active === 'demo-api') { for (const k of Object.keys(burn)) delete burn[k]; packets.clear() } setTimeout(demoRun, 800) }
+  }, 100)
+}
+
+// ---------- start ----------
+async function start() {
+  try { await document.fonts.ready } catch {}
+  const cs = getComputedStyle(document.body)
+  numFont = cs.getPropertyValue('--num') || 'monospace'
+  displayFont = cs.getPropertyValue('--display') || 'sans-serif'
+  resize()
+  addEventListener('resize', resize)
+  requestAnimationFrame(frame)
+  setInterval(renderRail, 1000)
+  if (DEMO) {
+    window.__AF_SESSIONS({ sessions: DEMO_SESSIONS.map(x => ({ ...x, lastSeen: Date.now() })) })
+    noteMeta({ id: 'demo-ct', project: 'notes-app', lastSeen: Date.now() - 3600_000, state: 'done' })
+    demoRun(); demoSmall()
+    openSession('demo-api')
+    setInterval(() => { for (const x of sessionList) if (x.id !== 'demo-ct') x.lastSeen = Date.now(); renderTabs() }, 2000)
+  }
+  else {
+    load('sessions.js')
+    setInterval(() => load('sessions.js'), 4000)
+    setInterval(() => { if (active) load(base() + 'state.js') }, 120)
+    setInterval(() => { for (const x of sessionList) load('s/' + encodeURIComponent(x.id) + '/meta.js') }, 2000)
+    setTimeout(() => { if (!sessionList.length) load('state.js') }, 1500) // an older single-session mod writes here
+  }
+}
+start()
+</script>
+</body>
+</html>

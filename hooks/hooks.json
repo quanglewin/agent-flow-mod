@@ -1,0 +1,4 @@
+{
+  "description": "agent-flow: tracks agent spawns, turns, streamed tokens, tool activity and inter-agent messages, and draws them in a neon pane (/agent-flow)",
+  "modules": ["./register.tsx"]
+}

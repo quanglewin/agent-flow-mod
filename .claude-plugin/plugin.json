@@ -1,0 +1,6 @@
+{
+  "name": "agent-flow",
+  "version": "0.3.0",
+  "description": "AGENT//FLOW: a live neon map of a Claude Code session's agents (who handed work to whom, what each is doing, its context, every task and report, tokens and speed), in the terminal, the desktop app and a browser dashboard with one tab per session.",
+  "types": "./types/index.d.ts"
+}
