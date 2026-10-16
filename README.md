@@ -4,7 +4,9 @@ See what your Claude Code agents are doing, live.
 
 When Claude starts subagents, it is hard to tell who is doing what, how far along they are, and when the work will be done. AGENT//FLOW draws it for you: every agent, the tasks passed between them, and how many tokens they use.
 
-![AGENT//FLOW map](docs/map.png)
+![AGENT//FLOW in action: running agents, dragging an orb, reading an agent's context and a task, the timeline, and the run finishing](docs/demo.gif)
+
+[Watch it in full quality (MP4)](docs/demo.mp4)
 
 ## What you get
 
