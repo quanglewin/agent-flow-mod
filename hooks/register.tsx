@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
 import type { AgentFlowAgent, AgentFlowGraph, AgentFlowLink, AgentFlowView } from '../types'
-import { sessionAdvisor } from './advisor'
+import { estimateCost, sessionAdvisor, sessionCost } from './advisor'
 import { summarize } from './context'
 import type { CtxSnapshot, MessageRow } from './context'
 import * as M from './model'
@@ -38,6 +38,12 @@ let dirty = false
 let sceneUrgent = false
 let sceneStale = false
 let lastSceneAt = 0
+/** Whole-graph snapshots, every ~2s while something visible happens: the dashboard's Replay tab scrubs through these. */
+const REPLAY_INTERVAL_MS = 2000
+const REPLAY_MAX = 180
+let replaySnaps: { t: number; graph: AgentFlowGraph }[] = []
+let replayDirty = false
+let lastReplayAt = 0
 /** Diagnostics for /agent-flow status: what the last open said, and who has drawn the pane. */
 let lastOpen = 'not opened yet'
 const drawsBySurface: Record<string, number> = {}
@@ -100,6 +106,130 @@ const DURATIONS_KEY = 'durations'
 const MAIN_TURN = '(main turn)'
 let durations: Record<string, number[]> = {}
 let durationsDirty = false
+
+/** A USD threshold for this project: /agent-flow advisor and /agent-flow status flag the session once its cost passes it. */
+const BUDGET_KEY = 'budget-usd'
+let budgetUsd: number | undefined
+
+/** A compact record of one run, kept across restarts so /agent-flow history and compare can look back. */
+type HistoryEntry = {
+  sessionId: string
+  project: string
+  startedAt: number
+  lastSeenAt: number
+  totalCost: number
+  totalTokens: number
+  cacheRate: number
+  overallScore: number
+  agentCount: number
+  /** From each agent's toolLog, which only keeps its newest TOOL_LOG_MAX calls: a recent-window count, not a lifetime total. */
+  toolCounts: Record<string, number>
+  agentTypeCounts: Record<string, number>
+}
+const HISTORY_KEY = 'run-history'
+const HISTORY_MAX = 20
+let runHistory: HistoryEntry[] = []
+let historyStoreDirty = false
+/** Bumped on every upsert; the web writer dumps history.js again once this outruns what it last wrote. */
+let historyRev = 0
+let historyWritten = -1
+
+/** This session's run, upserted into `runHistory` by sessionId so a restart does not duplicate it. */
+function upsertHistory(g: AgentFlowGraph, now: number): void {
+  if (!session.id) return
+  const rep = sessionAdvisor(g)
+  const toolCounts: Record<string, number> = {}
+  const agentTypeCounts: Record<string, number> = {}
+  let agentCount = 0
+  for (const id of g.order) {
+    const a = g.agents[id]
+    if (!a || a.isProcess) continue
+    agentCount += 1
+    agentTypeCounts[a.type] = (agentTypeCounts[a.type] ?? 0) + 1
+    for (const entry of a.toolLog ?? []) {
+      if (!entry.tool) continue
+      toolCounts[entry.tool] = (toolCounts[entry.tool] ?? 0) + 1
+    }
+  }
+  const entry: HistoryEntry = {
+    sessionId: session.id,
+    project: session.project,
+    startedAt: g.startedAt,
+    lastSeenAt: now,
+    totalCost: rep.totalCost,
+    totalTokens: rep.totalTokens,
+    cacheRate: rep.cacheRate,
+    overallScore: rep.overallScore,
+    agentCount,
+    toolCounts,
+    agentTypeCounts,
+  }
+  const i = runHistory.findIndex(h => h.sessionId === session.id)
+  if (i >= 0) runHistory[i] = entry
+  else runHistory.unshift(entry)
+  runHistory.sort((a, b) => b.lastSeenAt - a.lastSeenAt)
+  if (runHistory.length > HISTORY_MAX) runHistory.length = HISTORY_MAX
+  historyStoreDirty = true
+  historyRev += 1
+}
+
+/** The whole session (every agent, its cost, and the top suggestions), for /agent-flow export. */
+function reportData(g: AgentFlowGraph, project: string) {
+  const rep = sessionAdvisor(g)
+  const cost = sessionCost(g)
+  const agents = g.order
+    .map(id => g.agents[id])
+    .filter((a): a is AgentFlowAgent => !!a)
+    .map(a => {
+      const c = estimateCost(a)
+      return {
+        id: a.id,
+        label: a.label,
+        type: a.type,
+        status: a.status,
+        inTok: a.inTok,
+        outTok: a.outTok,
+        cacheTok: a.cacheTok,
+        tools: a.tools,
+        steps: a.steps,
+        costUsd: Number(c.actual.toFixed(3)),
+      }
+    })
+  return {
+    generatedAt: new Date().toISOString(),
+    project,
+    overallScore: rep.overallScore,
+    totalCost: Number(cost.total.toFixed(2)),
+    totalSaved: Number(cost.saved.toFixed(2)),
+    totalTokens: rep.totalTokens,
+    cacheRate: rep.cacheRate,
+    agents,
+    suggestions: rep.topSuggestions,
+  }
+}
+
+function reportMarkdown(d: ReturnType<typeof reportData>): string {
+  const lines = ['# AGENT//FLOW session report', '', `Generated: ${d.generatedAt}`]
+  if (d.project) lines.push(`Project: ${d.project}`)
+  lines.push(
+    '',
+    '## Summary',
+    `- Efficiency score: ${d.overallScore}/100`,
+    `- Estimated cost: $${d.totalCost.toFixed(2)} (saved $${d.totalSaved.toFixed(2)} via prompt caching)`,
+    `- Total tokens: ${M.fmt(d.totalTokens)}`,
+    `- Cache hit rate: ${Math.round(d.cacheRate * 100)}%`,
+    '',
+    '## Agents',
+    '| Agent | Type | Status | In | Out | Cache | Tools | Cost |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- |',
+  )
+  for (const a of d.agents) lines.push(`| ${a.label} | ${a.type} | ${a.status} | ${M.fmt(a.inTok)} | ${M.fmt(a.outTok)} | ${M.fmt(a.cacheTok)} | ${a.tools} | $${a.costUsd.toFixed(3)} |`)
+  if (d.suggestions.length > 0) {
+    lines.push('', '## Top suggestions')
+    for (const s of d.suggestions) lines.push(`- **[${s.severity}] ${s.title}** — ${s.summary}`)
+  }
+  return `${lines.join('\n')}\n`
+}
 
 function recordPacket(link: AgentFlowLink | undefined, body: string, meta: PacketDetail['meta']): void {
   if (!link) return
@@ -413,6 +543,18 @@ export const register: Register = on => {
       durations = {}
     }
     try {
+      const saved = await $.store.get(BUDGET_KEY)
+      if (typeof saved === 'number' && saved > 0) budgetUsd = saved
+    } catch {
+      budgetUsd = undefined
+    }
+    try {
+      const saved = await $.store.get(HISTORY_KEY)
+      if (Array.isArray(saved)) runHistory = saved as HistoryEntry[]
+    } catch {
+      runHistory = []
+    }
+    try {
       // the session id is read once the session has bound: the page is set up on the first web tick
       if ((await $.store.get(WEB_STORE_KEY)) === true && session.watched) webPending = true
     } catch {
@@ -421,7 +563,7 @@ export const register: Register = on => {
     await $.command.register({
       name: 'agent-flow',
       description: 'Open the neon agent map: compact (orbs) or detail (cards); reset clears it',
-      argumentHint: '[web|web demo|web off|compact|detail|demo|reset|status|pixels on|pixels off]',
+      argumentHint: '[web|web demo|web off|compact|detail|demo|reset|status|advisor|budget <amount>|export [md|json]|history|compare [a] [b]|pixels on|pixels off]',
     })
     $.clock.every(200, () => {
       try {
@@ -456,12 +598,28 @@ export const register: Register = on => {
             web.dirty = true
           })
         }
+        // history: cross-session, so it lives at the root next to sessions.js, not in this session's folder
+        if (historyWritten !== historyRev) {
+          const rev = historyRev
+          historyWritten = rev
+          const items = JSON.stringify({ rev, items: runHistory })
+          void $.fs.write(`${web.root}/history.js`, `window.__AF_HISTORY && window.__AF_HISTORY(${items})\n`).catch(() => {
+            historyWritten = -1
+          })
+        }
         if (packetsWritten !== packetsRev) {
           const rev = packetsRev
           packetsWritten = rev
           const items = JSON.stringify({ sid: session.id, rev, items: packetLog })
           void $.fs.write(`${web.dir}/packets.js`, `window.__AF_PACKETS && window.__AF_PACKETS(${items})\n`).catch(() => {
             packetsWritten = -1
+          })
+        }
+        if (replayDirty) {
+          replayDirty = false
+          const items = JSON.stringify({ sid: session.id, snaps: replaySnaps })
+          void $.fs.write(`${web.dir}/replay.js`, `window.__AF_REPLAY && window.__AF_REPLAY(${items})\n`).catch(() => {
+            replayDirty = true
           })
         }
         // contexts: at most every 0.7s, they can be large
@@ -515,11 +673,19 @@ export const register: Register = on => {
     })
     // finished runs' durations, saved so "usually takes" survives restarts
     $.clock.every(5000, () => {
-      if (!durationsDirty) return
-      durationsDirty = false
-      void $.store.set(DURATIONS_KEY, durations).catch(() => {
-        durationsDirty = true
-      })
+      void ensureSession($).then(() => upsertHistory(graph, Date.now())).catch(() => {})
+      if (durationsDirty) {
+        durationsDirty = false
+        void $.store.set(DURATIONS_KEY, durations).catch(() => {
+          durationsDirty = true
+        })
+      }
+      if (historyStoreDirty) {
+        historyStoreDirty = false
+        void $.store.set(HISTORY_KEY, runHistory).catch(() => {
+          historyStoreDirty = true
+        })
+      }
     })
     // the picture orbs: up to ~20 frames a second while anything moves, one frame in flight at a time
     $.clock.every(50, () => {
@@ -596,6 +762,12 @@ export const register: Register = on => {
         void update($, sceneAtom, () => scene).catch(() => {
           sceneUrgent = true
         })
+        if (now - lastReplayAt >= REPLAY_INTERVAL_MS) {
+          lastReplayAt = now
+          replaySnaps.push({ t: now, graph: scene })
+          if (replaySnaps.length > REPLAY_MAX) replaySnaps.shift()
+          replayDirty = true
+        }
       }
       if (dirty) {
         dirty = false
@@ -616,6 +788,8 @@ export const register: Register = on => {
       demo = null
       dirty = true
       sceneUrgent = true
+      replaySnaps = []
+      replayDirty = true
     }
     if (arg === 'web' || arg === 'web demo') {
       let page = ''
@@ -663,6 +837,95 @@ export const register: Register = on => {
       }
     }
     if (arg === 'compact' || arg === 'detail') await update($, viewAtom, () => arg)
+    if (arg === 'budget' || arg.startsWith('budget ')) {
+      const rest = arg.slice('budget'.length).trim().replace(/^\$/, '')
+      if (rest === 'off' || rest === 'clear') {
+        budgetUsd = undefined
+        await $.store.set(BUDGET_KEY, null).catch(() => {})
+        return { text: 'Budget alert turned off.' }
+      }
+      if (rest) {
+        const n = Number(rest)
+        if (!Number.isFinite(n) || n <= 0) return { text: 'Give a dollar amount, e.g. /agent-flow budget 5' }
+        budgetUsd = n
+        await $.store.set(BUDGET_KEY, n).catch(() => {})
+        return { text: `Budget alert set to $${n.toFixed(2)}. /agent-flow advisor and /agent-flow status flag this session once its cost passes it.` }
+      }
+      const cost = sessionCost(graph).total
+      return {
+        text:
+          budgetUsd === undefined
+            ? 'No budget set. /agent-flow budget <amount> sets one, e.g. /agent-flow budget 5.'
+            : `Budget: $${budgetUsd.toFixed(2)} · Current session cost: $${cost.toFixed(2)}${cost >= budgetUsd ? ' — OVER BUDGET' : ''}`,
+      }
+    }
+    if (arg === 'export' || arg.startsWith('export ')) {
+      const format = arg.slice('export'.length).trim() === 'json' ? 'json' : 'md'
+      const data = reportData(graph, session.project)
+      const base = (session.cwd || '.').replace(/[\\/]+$/, '')
+      const file = `${base}/agent-flow-report-${Date.now()}.${format}`
+      try {
+        await $.fs.write(file, format === 'json' ? JSON.stringify(data, null, 2) : reportMarkdown(data))
+      } catch (err) {
+        return { text: `Couldn't write the report: ${String(err)}` }
+      }
+      return { text: `Wrote the session report to ${file}` }
+    }
+    if (arg === 'history') {
+      await ensureSession($)
+      upsertHistory(graph, Date.now())
+      if (runHistory.length === 0) return { text: 'No finished runs recorded yet. History fills in a few seconds into each session, and survives restarts.' }
+      const toolTotals: Record<string, number> = {}
+      const typeTotals: Record<string, number> = {}
+      let totalCost = 0
+      for (const h of runHistory) {
+        totalCost += h.totalCost
+        for (const [k, v] of Object.entries(h.toolCounts)) toolTotals[k] = (toolTotals[k] ?? 0) + v
+        for (const [k, v] of Object.entries(h.agentTypeCounts)) typeTotals[k] = (typeTotals[k] ?? 0) + v
+      }
+      const topTool = Object.entries(toolTotals).sort((a, b) => b[1] - a[1])[0]
+      const topType = Object.entries(typeTotals).sort((a, b) => b[1] - a[1])[0]
+      const lines = [
+        `AGENT//FLOW Run History (${runHistory.length} run${runHistory.length > 1 ? 's' : ''}, $${totalCost.toFixed(2)} total)`,
+        topTool ? `Most-used tool: ${topTool[0]} (${topTool[1]}x)` : undefined,
+        topType ? `Most-used agent type: ${topType[0]} (${topType[1]}x)` : undefined,
+        '',
+      ].filter((l): l is string => l !== undefined)
+      runHistory.forEach((h, i) => {
+        lines.push(`${i + 1}. ${h.project || h.sessionId} — $${h.totalCost.toFixed(2)} · score ${h.overallScore}/100 · ${M.fmt(h.totalTokens)} tok · ${new Date(h.startedAt).toLocaleString()}`)
+      })
+      lines.push('', 'Compare two with /agent-flow compare [n] [n] (defaults to the two most recent).')
+      return { text: lines.join('\n') }
+    }
+    if (arg === 'compare' || arg.startsWith('compare ')) {
+      await ensureSession($)
+      upsertHistory(graph, Date.now())
+      const tokens = arg.slice('compare'.length).trim().split(/\s+/).filter(Boolean)
+      const pick = (token: string | undefined, fallbackIndex: number): HistoryEntry | undefined => {
+        if (!token) return runHistory[fallbackIndex]
+        const n = Number(token)
+        if (Number.isFinite(n) && n >= 1) return runHistory[n - 1]
+        return runHistory.find(h => h.sessionId.startsWith(token) || h.project === token)
+      }
+      const a = pick(tokens[0], 1)
+      const b = pick(tokens[1], 0)
+      if (!a || !b) return { text: 'Not enough recorded runs to compare. Run /agent-flow history to see what is available.' }
+      const dd = (x: number, y: number, dollar = false) => {
+        const d = y - x
+        const sign = d > 0 ? '+' : ''
+        return dollar ? `${sign}$${d.toFixed(2)}` : `${sign}${Math.round(d)}`
+      }
+      return {
+        text: [
+          `Comparing ${a.project || a.sessionId} (${new Date(a.startedAt).toLocaleString()}) vs ${b.project || b.sessionId} (${new Date(b.startedAt).toLocaleString()})`,
+          `Cost: $${a.totalCost.toFixed(2)} vs $${b.totalCost.toFixed(2)} (${dd(a.totalCost, b.totalCost, true)})`,
+          `Tokens: ${M.fmt(a.totalTokens)} vs ${M.fmt(b.totalTokens)} (${dd(a.totalTokens, b.totalTokens)})`,
+          `Efficiency score: ${a.overallScore} vs ${b.overallScore} (${dd(a.overallScore, b.overallScore)})`,
+          `Cache rate: ${Math.round(a.cacheRate * 100)}% vs ${Math.round(b.cacheRate * 100)}% (${dd(a.cacheRate * 100, b.cacheRate * 100)}pp)`,
+          `Agents: ${a.agentCount} vs ${b.agentCount} (${dd(a.agentCount, b.agentCount)})`,
+        ].join('\n'),
+      }
+    }
     if (arg === 'advisor') {
       const rep = sessionAdvisor(graph)
       const lines = [
@@ -671,6 +934,13 @@ export const register: Register = on => {
         `Estimated Cost: $${rep.totalCost.toFixed(2)} · Prompt Cache Saved: $${rep.totalSaved.toFixed(2)} (${Math.round(rep.cacheRate * 100)}% cache hit)`,
         `Total Tokens: ${M.fmt(rep.totalTokens)} across ${graph.order.length} agent(s)`,
       ]
+      if (budgetUsd !== undefined) {
+        lines.push(
+          rep.totalCost >= budgetUsd
+            ? `⚠ OVER BUDGET: $${rep.totalCost.toFixed(2)} spent against a $${budgetUsd.toFixed(2)} budget.`
+            : `Budget: $${budgetUsd.toFixed(2)} (${Math.round((rep.totalCost / budgetUsd) * 100)}% used)`,
+        )
+      }
       if (rep.topSuggestions.length > 0) {
         lines.push('', 'Top Prompt & Token Recommendations:')
         for (const s of rep.topSuggestions) {
@@ -690,12 +960,18 @@ export const register: Register = on => {
       lastOpen = opened.isPlaced ? 'placed' : `not placed: ${'reason' in opened ? String(opened.reason) : 'no reason given'}`
       const draws = Object.entries(drawsBySurface).map(([k, v]) => `${k}×${v}`).join(', ') || 'none'
       const ago = lastDrawAt ? `${Math.round((Date.now() - lastDrawAt) / 1000)}s ago` : 'never'
+      const cost = sessionCost(graph).total
       return {
         text: [
           `pane: ${lastOpen}`,
           `drawn by: ${draws} (last ${ago})`,
           `agents: ${graph.order.length} · packets: ${graph.links.length} · demo: ${demo ? 'running' : 'off'}`,
-        ].join('\n'),
+          budgetUsd !== undefined
+            ? `budget: $${budgetUsd.toFixed(2)} · cost: $${cost.toFixed(2)}${cost >= budgetUsd ? ' — OVER BUDGET' : ''}`
+            : undefined,
+        ]
+          .filter((l): l is string => l !== undefined)
+          .join('\n'),
       }
     }
     const opened = await $.ui.open({ id: PANE, title: TITLE })

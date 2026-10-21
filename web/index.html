@@ -82,6 +82,9 @@
   .views button[aria-pressed="true"] { background: var(--cyan); color: var(--void); }
   .bell { --cut: 7px; border: 0; padding: 7px 12px; cursor: pointer; background: var(--deck2); color: var(--muted); font-weight: 600; white-space: nowrap; }
   .bell[aria-pressed="true"] { background: var(--yellow); color: var(--void); }
+  .budget { --cut: 7px; border: 0; width: 84px; padding: 7px 10px; background: var(--deck2); color: var(--ink); font-weight: 600; font: inherit; }
+  .budget::placeholder { color: var(--muted); }
+  .budget.over { background: var(--red); color: var(--void); }
 
   .attention { display: flex; flex-wrap: wrap; gap: 8px; pointer-events: auto; }
   .attention:empty { display: none; }
@@ -93,6 +96,10 @@
   .attention .quiet i { background: var(--yellow); }
 
   .mapbar { position: absolute; left: 24px; bottom: 20px; display: flex; gap: 6px; z-index: 4; }
+  .replaybar { position: absolute; left: 24px; right: 24px; bottom: 20px; display: flex; align-items: center; gap: 10px; z-index: 4; background: var(--deck2); padding: 8px 12px; }
+  .replaybar button, .replaybar select { --cut: 6px; border: 0; background: rgba(255,255,255,0.06); color: var(--ink); padding: 6px 10px; cursor: pointer; font-weight: 600; font-size: 13px; }
+  .replaybar input[type="range"] { flex: 1; accent-color: var(--cyan); }
+  .replaybar .soft { color: var(--muted); font: 500 12px var(--num); white-space: nowrap; }
   canvas { touch-action: pan-y; }
   canvas.dragging { cursor: grabbing; }
   .donechip { --cut: 8px; border: 0; background: var(--deck2); color: var(--muted);
@@ -196,6 +203,8 @@
   .tools li.open span:last-child { color: var(--green); font-weight: 600; }
   .tool-cmd { grid-column: 1 / -1; margin-top: 3px; }
   .tool-cmd code { display: block; padding: 4px 8px; background: rgba(0,0,0,0.3); font: 400 12px var(--num); color: #9f97c7; white-space: pre-wrap; word-break: break-all; }
+  .tool-open { display: block; padding: 4px 8px; background: rgba(0,0,0,0.3); font: 400 12px var(--num); color: var(--cyan); white-space: pre-wrap; word-break: break-all; text-decoration: none; }
+  .tool-open:hover { text-decoration: underline; }
   .quote { margin: 0; padding: 10px 12px; border-left: 2px solid var(--tone, var(--cyan)); background: rgba(255, 255, 255, .03);
     font-size: 14px; line-height: 1.5; color: #e0daf9; white-space: pre-wrap; overflow-wrap: anywhere; }
 
@@ -288,6 +297,29 @@
   .advisor-score-tag.good { background: rgba(0, 229, 255, 0.15); color: var(--cyan); }
   .advisor-score-tag.waste { background: rgba(243, 230, 0, 0.15); color: var(--yellow); }
   .advisor-score-tag.bleed { background: rgba(255, 51, 85, 0.15); color: var(--red); }
+  .kanban-head { font: 500 13px var(--num); color: var(--muted); margin-bottom: 10px; }
+  .kanban-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; align-items: start; }
+  .kanban-col h4 { margin: 0 0 6px; font-size: 12.5px; color: var(--muted); display: flex; justify-content: space-between; text-transform: uppercase; letter-spacing: 0.03em; }
+  .kanban-col h4 span { color: var(--ink); background: rgba(255,255,255,0.08); border-radius: 2px; padding: 0 6px; font: 600 11px var(--num); }
+  .kanban-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; min-height: 20px; }
+  .kanban-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-left: 2px solid var(--cyan); padding: 8px 9px; }
+  .kanban-col:nth-child(2) .kanban-card { border-left-color: var(--yellow); }
+  .kanban-col:nth-child(3) .kanban-card { border-left-color: var(--green); opacity: 0.75; }
+  .kanban-text { font-size: 13px; color: var(--ink); line-height: 1.35; margin-bottom: 5px; }
+  .kanban-owner { border: 0; background: none; padding: 0; cursor: pointer; font: 600 11.5px var(--num); }
+  .kanban-owner:hover { text-decoration: underline; }
+  .kanban-empty { color: var(--muted); font-size: 12px; }
+  @media (max-width: 1100px) { .kanban-board { grid-template-columns: 1fr; } }
+  .history-list { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .history-row { display: flex; align-items: center; gap: 10px; padding: 7px 10px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); }
+  .history-row.picked { border-color: var(--cyan); background: rgba(0,229,255,0.06); }
+  .history-pick { border: 0; background: none; color: var(--cyan); font-size: 15px; cursor: pointer; padding: 0 2px; }
+  .history-info { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .history-info b { font-size: 13px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history-row span { font: 500 12px var(--num); color: var(--muted); white-space: nowrap; }
+  .compare-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+  .compare-table th, .compare-table td { padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,0.06); text-align: left; color: var(--ink); }
+  .compare-table th { color: var(--muted); font-weight: 600; }
   .advisor-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 12px 0 16px; }
   .advisor-cell { background: rgba(0,0,0,0.3); padding: 8px 10px; border: 1px solid rgba(255,255,255,0.05); }
   .advisor-cell b { display: block; font: 600 15px/1.2 var(--num); color: var(--ink); }
@@ -341,7 +373,15 @@
     <div class="views" role="group" aria-label="View">
       <button type="button" class="chamfer" data-view="map" aria-pressed="true">Map</button>
       <button type="button" class="chamfer" data-view="timeline" aria-pressed="false">Timeline</button>
+      <button type="button" class="chamfer" data-view="replay" aria-pressed="false">Replay</button>
     </div>
+    <input type="number" min="0" step="0.5" class="budget chamfer" id="budget" placeholder="Budget $" title="Alert (with the bell above) once this session's estimated cost passes this amount. Also draws a fuel-gauge ring on each agent, showing its share burned.">
+    <input type="number" min="0" step="5" class="budget chamfer" id="longrun" placeholder="Alert after N min" title="Alert (with the bell above) once any single agent has been running longer than N minutes, so a long background run does not go unnoticed">
+
+    <select class="budget chamfer" id="editor" title="Which editor a Read/Write/Edit tool call opens, from the agent's tool log">
+      <option value="vscode">VS Code</option>
+      <option value="cursor">Cursor</option>
+    </select>
     <button type="button" class="bell chamfer" id="bell" aria-pressed="false" title="Play a sound and notify when the work is done">◈ <span class="lbl">Notify when done</span></button>
   </div>
   <div class="stabs" id="tabs" role="tablist" aria-label="Claude Code sessions"></div>
@@ -351,6 +391,17 @@
   <div class="tip" id="tip" role="tooltip"></div>
   <div class="switching" id="switching" aria-live="polite"><div><b id="sw-title"></b><span id="sw-text"></span></div></div>
   <div class="mapbar"><button type="button" class="donechip chamfer" id="donechip" hidden></button><button type="button" class="donechip chamfer" id="resetpins" hidden>Reset layout</button></div>
+  <div class="replaybar chamfer" id="replaybar" hidden>
+    <button type="button" class="chamfer" id="replay-play" title="Play / pause">▶</button>
+    <select class="chamfer" id="replay-rate" title="Playback speed">
+      <option value="1">1x</option>
+      <option value="2">2x</option>
+      <option value="4">4x</option>
+      <option value="8">8x</option>
+    </select>
+    <input type="range" id="replay-seek" min="0" max="0" value="0" step="1">
+    <span id="replay-status" class="soft"></span>
+  </div>
   <div class="empty" id="empty"><div>
     <p>No agents to show yet</p>
     <p>In Claude Code, run <code>/agent-flow web</code>. This map fills in as agents start, hand off work and report back.</p>
@@ -386,6 +437,10 @@ const pageStart = Date.now()
 const KIND_COLOR = { prompt: '#F3E600', user: '#00E5FF', reply: '#FF2E88', call: '#B48CFF', result: '#3DFF8F', error: '#FF3355' }
 const KIND_NAME = { prompt: 'The task it was handed', user: 'Your messages', reply: 'What it wrote', call: 'Its tool calls', result: 'Tool results', error: 'Tool errors' }
 const PACKET_NAME = { spawn: 'Task handed over', report: 'Report back', message: 'Direct message' }
+/** Tool calls whose detail is a file path: these can be opened in an editor from the tool log. */
+const EDITOR_TOOLS = new Set(['Read', 'Write', 'Edit', 'NotebookEdit'])
+function editorScheme() { try { return localStorage.getItem('agent-flow-editor') || 'vscode' } catch { return 'vscode' } }
+function editorLink(path) { return `${editorScheme()}://file/${path}` }
 
 const $ = id => document.getElementById(id)
 const fmt = n => n < 1000 ? String(Math.round(n)) : n < 1e6 ? (n / 1000).toFixed(n < 1e4 ? 1 : 0).replace(/\.0$/, '') + 'k' : (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M'
@@ -397,6 +452,8 @@ const dur = ms => { const s = Math.max(0, Math.round(ms / 1000)); if (s < 60) re
 const clock = ms => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 const ago = ms => ms < 1500 ? 'just now' : dur(ms) + ' ago'
 const mmss = ms => { const s = Math.max(0, Math.floor(ms / 1000)); const m = Math.floor(s / 60); return (m >= 60 ? Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0') : m) + ':' + String(s % 60).padStart(2, '0') }
+/** Mission Elapsed Time, T+HH:MM:SS, the way a launch broadcast counts up from liftoff. */
+const met = ms => { const s = Math.max(0, Math.floor(ms / 1000)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return `T+${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}` }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]) }
 const setHtml = (el, html) => { if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; return true } return false }
 
@@ -412,6 +469,8 @@ const burn = {} // per agent: [{t, v}] its writing speed over time
 const packets = new Map() // link id → full packet
 let contexts = { agents: {}, main: null }
 let packetsRev = -1, ctxRev = -1
+let seenAgentStatus = {} // per agent: its status as of the last push, to catch launch/touchdown moments
+let seenFirstPush = false // the first push just hydrates the page: nothing in it is a "new" launch
 
 window.__AF_PUSH = payload => {
   if (!payload || !payload.graph || (payload.sid && payload.sid !== active)) return
@@ -420,12 +479,20 @@ window.__AF_PUSH = payload => {
   lastPush = Date.now()
   $('switching').classList.remove('show')
   const t = payload.now || lastPush
+  const isFirstPush = !seenFirstPush
+  seenFirstPush = true
   for (const id of graph.order) {
     const a = graph.agents[id]; if (!a) continue
     const h = burn[id] || (burn[id] = [])
     const v = a.status === 'running' ? (a.tps || 0) : 0
     if (!h.length || t - h[h.length - 1].t >= 250) h.push({ t, v })
     if (h.length > 1200) h.splice(0, h.length - 1200)
+    const prev = seenAgentStatus[id]
+    if (!isFirstPush && id !== MAIN && !a.isProcess) {
+      if (prev === undefined) chimeLaunch()
+      else if (prev === 'running' && (a.status === 'done' || a.status === 'error')) chimeTouchdown(a.status === 'done')
+    }
+    seenAgentStatus[id] = a.status
   }
   const rev = payload.rev || {}
   if (!DEMO && rev.packets !== undefined && rev.packets !== packetsRev) load(base() + 'packets.js')
@@ -453,6 +520,57 @@ window.__AF_CTX = data => {
   railSoon()
 }
 
+// ---------- replay: scrub through a finished session from its periodic snapshots ----------
+let replaySnaps = []
+let replayIdx = 0
+let replayPlaying = false
+let replayRate = 1
+let replayTimer = null
+window.__AF_REPLAY = data => {
+  if (!data || (data.sid && data.sid !== active)) return
+  replaySnaps = Array.isArray(data.snaps) ? data.snaps : []
+  if (replayIdx >= replaySnaps.length) replayIdx = Math.max(0, replaySnaps.length - 1)
+  if (view === 'replay') renderReplayBar()
+}
+function replaySnap() { return replaySnaps[replayIdx] || null }
+function replayPause() { replayPlaying = false; clearTimeout(replayTimer); replayTimer = null; renderReplayBar() }
+function replayStep() {
+  if (!replayPlaying) return
+  if (replayIdx >= replaySnaps.length - 1) { replayPause(); return }
+  const prevT = replaySnaps[replayIdx].t
+  replayIdx += 1
+  renderReplayBar()
+  const waitMs = Math.max(60, ((replaySnaps[replayIdx]?.t ?? prevT) - prevT) / replayRate)
+  replayTimer = setTimeout(replayStep, waitMs)
+}
+function replayPlay() {
+  if (replayPlaying || replaySnaps.length < 2) return
+  if (replayIdx >= replaySnaps.length - 1) replayIdx = 0
+  replayPlaying = true
+  renderReplayBar()
+  replayStep()
+}
+function replaySeek(i) {
+  replayPause()
+  replayIdx = Math.max(0, Math.min(replaySnaps.length - 1, Math.round(i)))
+  renderReplayBar()
+}
+function renderReplayBar() {
+  const bar = $('replaybar')
+  bar.hidden = view !== 'replay'
+  if (view !== 'replay') return
+  const snap = replaySnap()
+  $('replay-play').textContent = replayPlaying ? '⏸' : '▶'
+  const seek = $('replay-seek')
+  seek.max = String(Math.max(0, replaySnaps.length - 1))
+  if (document.activeElement !== seek) seek.value = String(replayIdx)
+  $('replay-status').textContent = snap
+    ? `${clock(snap.t)} · ${replayIdx + 1} / ${replaySnaps.length}`
+    : replaySnaps.length === 0
+      ? 'No snapshots yet — they are recorded every ~2s while the session runs.'
+      : ''
+}
+
 // ---------- sessions: one tab per Claude Code session ----------
 // sessions.js lists them (each session adds itself); s/<id>/meta.js says what each is doing, written by that session alone.
 let sessionList = []
@@ -475,6 +593,14 @@ window.__AF_SESSIONS = data => {
 window.__AF_META = m => {
   if (!m || !m.id) return
   noteMeta(m)
+}
+
+// ---------- run history: past sessions, cross-session, for the History tab ----------
+let runHistory = []
+window.__AF_HISTORY = data => {
+  if (!data || !Array.isArray(data.items)) return
+  runHistory = data.items
+  railSoon()
 }
 function noteMeta(m) {
   const prev = seenState[m.id]
@@ -501,8 +627,10 @@ function openSession(id) {
   for (const el of [$('agents'), $('agent'), $('wire'), $('plate-in')]) { el.innerHTML = ''; el.dataset.html = '' }
   try { history.replaceState(null, '', '#s=' + encodeURIComponent(id)) } catch {}
   loadPins(); $('resetpins').hidden = !Object.keys(pins).length
+  replaySnaps = []; replayIdx = 0; replayPause()
+  seenAgentStatus = {}; seenFirstPush = false
   if (DEMO) demoShow(id)
-  else { load(base() + 'state.js'); load(base() + 'packets.js'); load(base() + 'context.js') }
+  else { load(base() + 'state.js'); load(base() + 'packets.js'); load(base() + 'context.js'); load(base() + 'replay.js') }
   renderTabs()
   // say what is happening until the session's data arrives, and what to do if it never does
   const x = sessionList.find(s => s.id === id)
@@ -1072,6 +1200,28 @@ function icon(kind, x, y, s, color, alpha) {
   ctx.restore()
 }
 
+/** Rapid Unscheduled Disassembly: a brief debris burst the moment an agent fails. */
+const RUD_MS = 900
+function rud(x, y, r, endedAt, t) {
+  const elapsed = t - (endedAt || t)
+  if (elapsed < 0 || elapsed > RUD_MS) return
+  const p = elapsed / RUD_MS
+  ctx.save()
+  ctx.globalCompositeOperation = 'lighter'
+  for (let k = 0; k < 10; k++) {
+    const ang = k * 2.399963 // golden-angle spread: deterministic, no stored state needed
+    const dist = r * (0.6 + p * 2.2)
+    const px = x + Math.cos(ang) * dist, py = y + Math.sin(ang) * dist
+    const size = Math.max(0.5, 3.2 * (1 - p))
+    ctx.beginPath(); ctx.arc(px, py, size, 0, Math.PI * 2)
+    ctx.fillStyle = `rgba(255,${80 + (k % 3) * 40},${60 + (k % 2) * 40},${0.9 * (1 - p)})`
+    ctx.shadowColor = '#FF3355'; ctx.shadowBlur = 8
+    ctx.fill()
+  }
+  ctx.shadowBlur = 0
+  ctx.restore()
+}
+
 function drawOrb(a, n, t) {
   if (!a || n.r < 4) return
   const c = colorOf(a)
@@ -1080,6 +1230,8 @@ function drawOrb(a, n, t) {
   const alpha = running ? 1 : a.status === 'error' ? 0.95 : 0.6
   const spin = REDUCED ? 0 : t / 1100
   const x = n.x, y = n.y, r = n.r
+  // running, but nothing streamed or finished a tool call in a while: the same signal the attention banner uses
+  const quiet = running && a.lastActiveAt && t - a.lastActiveAt > QUIET_MS && !a.activity
 
   // body: a dark glass disc lit from inside in the agent's colour
   const body = ctx.createRadialGradient(x - r * 0.25, y - r * 0.3, r * 0.05, x, y, r)
@@ -1130,11 +1282,11 @@ function drawOrb(a, n, t) {
     const scan = spin * 2.2
     ctx.beginPath(); ctx.arc(x, y, R3, scan, scan + 0.35); ctx.stroke()
     ctx.restore()
-    // the heartbeat
+    // the heartbeat: amber and slower once it has gone quiet, so a stalled-looking agent reads differently from a busy one
     if (!REDUCED) {
-      const beat = (t % 2000) / 2000
+      const beat = quiet ? (t % 3400) / 3400 : (t % 2000) / 2000
       ctx.beginPath(); ctx.arc(x, y, r + beat * 30, 0, Math.PI * 2)
-      ctx.lineWidth = 1.5; ctx.strokeStyle = rgba(c, 0.45 * (1 - beat) * (1 - beat)); ctx.stroke()
+      ctx.lineWidth = 1.5; ctx.strokeStyle = rgba(quiet ? '#f3c969' : c, 0.45 * (1 - beat) * (1 - beat)); ctx.stroke()
     }
   } else {
     ctx.beginPath(); ctx.arc(x, y, R1, 0, Math.PI * 2)
@@ -1145,6 +1297,15 @@ function drawOrb(a, n, t) {
     ctx.save(); ctx.lineCap = 'round'
     ctx.beginPath(); ctx.arc(x, y, R2 - 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (p.done / p.total))
     ctx.lineWidth = 2.6; ctx.strokeStyle = rgba('#F3E600', 0.95); ctx.shadowColor = '#F3E600'; ctx.shadowBlur = 8; ctx.stroke()
+    ctx.restore()
+  }
+  // a fuel gauge: this agent's share of the session budget burned so far
+  if (budgetUsd && !a.isProcess) {
+    const frac = Math.min(1, estimateCost(a).actual / budgetUsd)
+    const fuelColor = frac < 0.6 ? '#3dff8f' : frac < 0.9 ? '#f3e600' : '#ff3355'
+    ctx.save(); ctx.lineCap = 'round'
+    ctx.beginPath(); ctx.arc(x, y, r + 5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac)
+    ctx.lineWidth = 2; ctx.strokeStyle = rgba(fuelColor, 0.9); ctx.shadowColor = fuelColor; ctx.shadowBlur = 6; ctx.stroke()
     ctx.restore()
   }
   if (selected === a.id) brackets(x, y, r + 30, '#FFFFFF', 0.85)
@@ -1165,6 +1326,7 @@ function drawOrb(a, n, t) {
   } else if (a.status === 'error') {
     badge('rgba(60,8,20,0.95)', '#FF3355')
     ctx.fillStyle = '#ffd0d8'; ctx.font = `700 ${br * 1.2}px ${displayFont}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('!', bx, by + 1)
+    rud(x, y, r, a.endedAt, t)
   } else if (finished) {
     badge('rgba(10,6,20,0.95)', rgba(c, 0.8))
     ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 1.8; ctx.lineCap = 'round'
@@ -1202,12 +1364,12 @@ function drawOrb(a, n, t) {
   }
   ly += narrow ? 15 : 18
   ctx.font = `500 ${narrow ? 11.5 : 13}px ${displayFont}`
-  ctx.fillStyle = a.activity ? '#e2dbff' : '#9188bc'
+  ctx.fillStyle = quiet ? '#f3c969' : a.activity ? '#e2dbff' : '#9188bc'
   // when the name already is its task, the last line says how it is going instead of repeating it
   const named = a.role && a.role.startsWith(a.label.replace(/(…| #\d+)+$/, ''))
   const how = a.status === 'done' ? 'done in ' + dur((a.endedAt || t) - a.startedAt) : a.status === 'error' ? 'failed' : running ? 'working' : a.role
   const toolTimer = a.activeStartedAt ? ` [${dur(t - a.activeStartedAt)}]` : ''
-  const actText = a.activity ? `${a.activity}${toolTimer}` : (p.current && running ? p.current : named ? how : a.role)
+  const actText = quiet ? `quiet for ${dur(t - a.lastActiveAt)}` : a.activity ? `${a.activity}${toolTimer}` : (p.current && running ? p.current : named ? how : a.role)
   ctx.fillText(clip(actText, room + 8), x, ly)
 }
 
@@ -1240,7 +1402,24 @@ function burst(n, color, p, l, tags) {
     ctx.lineWidth = w; ctx.strokeStyle = col === '#FFFFFF' ? `rgba(255,255,255,${0.8 * (1 - q) ** 2})` : rgba(col, (1 - q) ** 2)
     ctx.shadowColor = col; ctx.shadowBlur = 14; ctx.stroke(); ctx.shadowBlur = 0
   }
+  // a report landing: two collars rotate into alignment, like a docking capture ring
+  if (l.kind === 'report') dock(n.x, n.y, n.r, color, p)
   tags.push({ x: n.x + n.r + 14, y: n.y - n.r - 6 - p * 30, s: `+${fmt(l.tokens)} tok`, c: color, a: 1 - p * p })
+}
+
+function dock(x, y, r, color, p) {
+  const ringR = r + 10
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.beginPath(); ctx.arc(0, 0, ringR, 0, Math.PI * 2)
+  ctx.lineWidth = 1.2; ctx.strokeStyle = `rgba(255,255,255,${0.5 * (1 - p)})`; ctx.stroke()
+  ctx.rotate((1 - p) * Math.PI * 0.9)
+  ctx.lineWidth = 2; ctx.strokeStyle = rgba(color, 0.9 * (1 - p * 0.6))
+  for (let k = 0; k < 6; k++) {
+    const a0 = (k / 6) * Math.PI * 2
+    ctx.beginPath(); ctx.arc(0, 0, ringR + 3, a0, a0 + 0.35); ctx.stroke()
+  }
+  ctx.restore()
 }
 
 // ---------- timeline view ----------
@@ -1311,7 +1490,11 @@ function drawTimeline(g, t) {
     ctx.fillStyle = a.status === 'running' ? '#3dff8f' : a.status === 'error' ? '#ff3355' : '#9188bc'
     const p = progressOf(a)
     const st = a.status === 'running' ? 'running ' + dur(t - start) : a.status === 'done' || (id === MAIN && a.endedAt) ? 'done in ' + dur(end - start) : a.status
-    ctx.fillText(st + (p.total ? `  ${p.done}/${p.total}` : ''), 16 + depth * 12, mid + 9)
+    // Max Q: the moment this agent wrote fastest, aerospace-style (the point of highest dynamic pressure)
+    let apex = null
+    for (const q of rates[id] || []) if (!apex || q.v > apex.v) apex = q
+    const maxQ = apex && apex.v > 2 ? `  ⚡ Max Q ${Math.round(apex.v)} tok/s` : ''
+    ctx.fillText(st + (p.total ? `  ${p.done}/${p.total}` : '') + maxQ, 16 + depth * 12, mid + 9)
 
     // the expected finish, as a ghost extension of a running bar
     const e = a.status === 'running' ? usual(id === MAIN ? MAIN_TURN : a.type) : null
@@ -1341,6 +1524,10 @@ function drawTimeline(g, t) {
       ctx.beginPath()
       r.forEach((q, k) => (k ? ctx.lineTo(X(q.t), Y(q.v)) : ctx.moveTo(X(q.t), Y(q.v))))
       ctx.strokeStyle = rgba(c, 0.95); ctx.lineWidth = 1.4; ctx.stroke()
+      if (apex && apex.v > 2) {
+        ctx.beginPath(); ctx.arc(X(apex.t), Y(apex.v), 2.6, 0, Math.PI * 2)
+        ctx.fillStyle = '#ffffff'; ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 6; ctx.fill(); ctx.shadowBlur = 0
+      }
       ctx.restore()
     }
 
@@ -1407,7 +1594,11 @@ function frame(now) {
   $('empty').classList.toggle('show', !g || (g.order.length <= 1 && g.links.length === 0 && !(m0 && (m0.steps || m0.status === 'running'))))
   updateConn(t)
   if (!g) return
-  if (view === 'map') drawMap(g, t)
+  if (view === 'replay') {
+    const snap = replaySnap()
+    if (snap) drawMap(snap.graph, snap.t)
+    else drawMap(g, t)
+  } else if (view === 'map') drawMap(g, t)
   else drawTimeline(g, t)
 }
 
@@ -1423,6 +1614,8 @@ function updateConn(t) {
 let lastState = null
 let bellOn = false
 let audio = null
+let budgetUsd = null
+let budgetAlerted = false
 
 function renderMission(g, now) {
   const M = mission(g, now)
@@ -1437,6 +1630,7 @@ function renderMission(g, now) {
   </div>`
   const sc = sessionCost(g)
   const sRep = sessionAdvisor(g)
+  checkBudget(sc.total)
   const advBadge = (g && g.order.length > 0 && sc.total > 0) ? `
     <div class="mission-advisor-badge chamfer" onclick="tab='advisor';renderRail()">
       <span>💡 Efficiency: <b>${sRep.overallScore}%</b> · Cost: <b>$${sc.total.toFixed(2)}</b></span>
@@ -1466,7 +1660,7 @@ function renderMission(g, now) {
           ${activeSub.activeStartedAt ? `<span class="time-tag">⏱ ${dur(now - activeSub.activeStartedAt)}</span>` : ''}
         </div>
       </div>` : ''
-    html = `<div class="state"><span class="word">${word}</span><span class="clockv">${mmss(now - M.turnStart)}</span></div>
+    html = `<div class="state"><span class="word">${word}</span><span class="clockv">${met(now - M.turnStart)}</span></div>
       ${planLine}
       ${frac !== null ? `<div class="bar${M.plan.total ? '' : ' est'}"><i style="width:${Math.round(Math.min(1, frac) * 100)}%"></i></div>` : ''}
       <p class="line soft">${e && e.text ? e.text : 'Started ' + clock(M.turnStart)}</p>
@@ -1493,7 +1687,7 @@ function renderMission(g, now) {
   lastState = M.state
   const am = active && (metas[active] || sessionList.find(x => x.id === active))
   const name = am && am.project ? am.project + ' · AGENT//FLOW' : 'AGENT//FLOW'
-  const want = M.state === 'running' ? `▶ ${mmss(now - M.turnStart)} · ${name}` : M.state === 'done' ? `✓ Done · ${name}` : M.state === 'failed' ? `! Done with failures · ${name}` : name
+  const want = M.state === 'running' ? `▶ ${met(now - M.turnStart)} · ${name}` : M.state === 'done' ? `✓ Done · ${name}` : M.state === 'failed' ? `! Done with failures · ${name}` : name
   if (document.title !== want) document.title = want
 }
 
@@ -1507,19 +1701,26 @@ function finished(M) {
       new Notification('Claude Code is done', { body: M.failed.length ? `${M.failed.length} agent(s) failed` : 'The run finished; Claude is waiting for you.' })
   } catch {}
 }
-function chime() {
-  if (!bellOn) return
+/** A few short oscillator notes, only while the bell is on. [freq, delay, length?] triples, in seconds. */
+function playTones(notes, type = 'square', gain = 0.08) {
+  if (!bellOn || !audio) return
   try {
-    if (audio) {
-      const t = audio.currentTime
-      for (const [f, d] of [[880, 0], [1320, 0.12]]) {
-        const o = audio.createOscillator(), gn = audio.createGain()
-        o.type = 'square'; o.frequency.value = f
-        gn.gain.setValueAtTime(0.0001, t + d); gn.gain.exponentialRampToValueAtTime(0.08, t + d + 0.02); gn.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.25)
-        o.connect(gn).connect(audio.destination); o.start(t + d); o.stop(t + d + 0.3)
-      }
+    const t = audio.currentTime
+    for (const [f, d, len = 0.25] of notes) {
+      const o = audio.createOscillator(), gn = audio.createGain()
+      o.type = type; o.frequency.value = f
+      gn.gain.setValueAtTime(0.0001, t + d); gn.gain.exponentialRampToValueAtTime(gain, t + d + 0.02); gn.gain.exponentialRampToValueAtTime(0.0001, t + d + len)
+      o.connect(gn).connect(audio.destination); o.start(t + d); o.stop(t + d + len + 0.05)
     }
   } catch {}
+}
+function chime() { playTones([[880, 0, 0.25], [1320, 0.12, 0.25]]) }
+/** A quick rising blip when a new subagent starts, like an ignition tone. */
+function chimeLaunch() { playTones([[700, 0, 0.08], [1000, 0.05, 0.1]], 'square', 0.05) }
+/** A soft descending landing thump on success, a low buzz on failure. */
+function chimeTouchdown(success) {
+  if (success) playTones([[640, 0, 0.12], [420, 0.08, 0.18]], 'sine', 0.06)
+  else playTones([[160, 0, 0.22]], 'sawtooth', 0.06)
 }
 $('bell').addEventListener('click', () => {
   bellOn = !bellOn
@@ -1530,6 +1731,84 @@ $('bell').addEventListener('click', () => {
     try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission() } catch {}
   }
 })
+
+// a USD threshold, per browser: alert (with the same bell/notification used when a run finishes)
+// once the session's estimated cost passes it, so a developer does not have to keep checking.
+function checkBudget(total) {
+  if (!budgetUsd) return
+  const over = total >= budgetUsd
+  $('budget').classList.toggle('over', over)
+  if (over && !budgetAlerted) {
+    budgetAlerted = true
+    chime()
+    try {
+      if (bellOn && 'Notification' in window && Notification.permission === 'granted' && document.hidden)
+        new Notification('AGENT//FLOW budget alert', { body: `Session cost reached $${total.toFixed(2)} (budget $${budgetUsd.toFixed(2)})` })
+    } catch {}
+  } else if (!over && total < budgetUsd * 0.9) {
+    budgetAlerted = false // a cheaper session (new tab, or /agent-flow reset) can alert again
+  }
+}
+const budgetEl = $('budget')
+try { const saved = Number(localStorage.getItem('agent-flow-budget')); if (saved > 0) budgetEl.value = saved, budgetUsd = saved } catch {}
+budgetEl.addEventListener('change', () => {
+  const n = Number(budgetEl.value)
+  budgetUsd = n > 0 ? n : null
+  budgetAlerted = false
+  budgetEl.classList.remove('over')
+  try { budgetUsd ? localStorage.setItem('agent-flow-budget', String(budgetUsd)) : localStorage.removeItem('agent-flow-budget') } catch {}
+})
+
+// a running agent gone quiet (the same signal behind the "attention" chips): alert once per quiet spell,
+// so a background run that has not updated in a while does not need someone staring at the tab to notice.
+let quietAlerted = new Set()
+function checkQuietAlerts(items) {
+  const now = new Set(items.filter(it => it.kind === 'quiet').map(it => it.id))
+  for (const id of now) {
+    if (quietAlerted.has(id)) continue
+    quietAlerted.add(id)
+    chime()
+    try {
+      if (bellOn && 'Notification' in window && Notification.permission === 'granted' && document.hidden)
+        new Notification('AGENT//FLOW: an agent has gone quiet', { body: (items.find(x => x.id === id) || {}).text || 'Check the map.' })
+    } catch {}
+  }
+  for (const id of [...quietAlerted]) if (!now.has(id)) quietAlerted.delete(id) // it resumed: a future quiet spell can alert again
+}
+
+// a USD-style minute threshold, per browser: alert once any single agent's total run time passes it —
+// the "if it's not done in 90 minutes, ping me" judgment call, automated instead of remembered.
+let longRunMin = null
+let longRunAlerted = new Set()
+function checkLongRun(g, now) {
+  if (!longRunMin) return
+  const thresholdMs = longRunMin * 60000
+  const stillRunning = new Set()
+  for (const id of g.order) {
+    const a = g.agents[id]
+    if (!a || id === MAIN || a.isProcess || a.status !== 'running') continue
+    stillRunning.add(id)
+    if (now - a.startedAt < thresholdMs || longRunAlerted.has(id)) continue
+    longRunAlerted.add(id)
+    chime()
+    try {
+      if (bellOn && 'Notification' in window && Notification.permission === 'granted' && document.hidden)
+        new Notification('AGENT//FLOW: a long-running agent', { body: `${a.label} has been running for ${dur(now - a.startedAt)}, past your ${longRunMin}m alert.` })
+    } catch {}
+  }
+  for (const id of [...longRunAlerted]) if (!stillRunning.has(id)) longRunAlerted.delete(id)
+}
+const longRunEl = $('longrun')
+try { const saved = Number(localStorage.getItem('agent-flow-longrun')); if (saved > 0) longRunEl.value = saved, longRunMin = saved } catch {}
+longRunEl.addEventListener('change', () => {
+  const n = Number(longRunEl.value)
+  longRunMin = n > 0 ? n : null
+  longRunAlerted = new Set()
+  try { longRunMin ? localStorage.setItem('agent-flow-longrun', String(longRunMin)) : localStorage.removeItem('agent-flow-longrun') } catch {}
+})
+const editorEl = $('editor')
+editorEl.value = editorScheme()
+editorEl.addEventListener('change', () => { try { localStorage.setItem('agent-flow-editor', editorEl.value) } catch {} })
 
 // ---------- side rail ----------
 let renderedLinks = 0
@@ -1544,6 +1823,8 @@ function renderRail() {
 
   const items = attentionItems(g, now)
   setHtml($('attention'), items.map(it => `<button type="button" class="${it.kind} chamfer" data-id="${esc(it.id)}"><i></i>${esc(it.text)}</button>`).join(''))
+  checkQuietAlerts(items)
+  checkLongRun(g, now)
 
   const order = shownOrder(g, now, 'map')
   const hidden = hiddenCount(g, now)
@@ -1591,13 +1872,13 @@ function renderAgent(g, a, now) {
   const head = `<div class="agent-head"><h3 style="color:${c}">${esc(a.label)}</h3>
     <p>${esc(a.id === MAIN ? 'The orchestrator: talks to you, plans, hands out work' : a.isProcess ? 'External process started by ' + ((a.parent && g.agents[a.parent] && g.agents[a.parent].label) || 'agent') : a.type + (a.parent && a.parent !== MAIN && g.agents[a.parent] ? ', started by ' + g.agents[a.parent].label : ''))}</p></div>
     <div class="tabs" role="tablist" aria-label="About ${esc(a.label)}">
-      ${[['overview', 'Overview'], ['context', 'Context'], ['packets', 'Packets'], ['advisor', 'Advisor 💡']].map(([k, n]) =>
+      ${[['overview', 'Overview'], ['context', 'Context'], ['packets', 'Packets'], ['advisor', 'Advisor 💡'], ['tasks', 'Tasks 🗂'], ['history', 'History 📜']].map(([k, n]) =>
         `<button type="button" role="tab" class="chamfer" data-tab="${k}" aria-selected="${tab === k}">${n}</button>`).join('')}
     </div>`
   setHtml($('agent-h'), head)
   const bodyEl = $('agent-b')
   bodyEl.style.setProperty('--tone', c)
-  const body = tab === 'context' ? contextTab(g, a, now) : tab === 'packets' ? packetsTab(g, a, now) : tab === 'advisor' ? advisorTab(g, a, now) : overviewTab(g, a, now)
+  const body = tab === 'context' ? contextTab(g, a, now) : tab === 'packets' ? packetsTab(g, a, now) : tab === 'advisor' ? advisorTab(g, a, now) : tab === 'tasks' ? tasksTab(g) : tab === 'history' ? historyTab() : overviewTab(g, a, now)
   const list = bodyEl.querySelector('.entries')
   const keepScroll = list ? list.scrollTop : null
   const atBottom = list ? list.scrollHeight - list.scrollTop - list.clientHeight < 8 : true
@@ -1652,7 +1933,11 @@ function overviewTab(g, a, now) {
   const tools = (a.toolLog || []).slice(-12).reverse().map(tl => {
     const isOpen = tl.end === undefined
     const durationStr = isOpen ? 'running ' + dur(now - tl.at) : dur(tl.end - tl.at)
-    const detailRow = tl.detail ? `<div class="tool-cmd"><code>${esc(tl.detail)}</code></div>` : ''
+    const detailRow = tl.detail
+      ? EDITOR_TOOLS.has(tl.tool)
+        ? `<div class="tool-cmd"><a href="${esc(editorLink(tl.detail))}" class="tool-open" title="Open in your editor">${esc(tl.detail)} ↗</a></div>`
+        : `<div class="tool-cmd"><code>${esc(tl.detail)}</code></div>`
+      : ''
     return `<li class="${isOpen ? 'open' : ''}">
       <span title="${esc(tl.text)}">${isOpen ? '▶ ' : ''}${esc(tl.text)}</span>
       <span>${durationStr}</span>
@@ -1987,7 +2272,172 @@ function advisorTab(g, a, now) {
       </div>
       <p class="advisor-desc">Paste these rules into your project's <code>CLAUDE.md</code> to enforce token-saving habits across all subagents.</p>
     </div>
+
+    <div class="advisor-rules-card">
+      <div class="advisor-head">
+        <span class="advisor-title" style="color:var(--cyan)">Export this session's report</span>
+      </div>
+      <p class="advisor-desc">Every agent, its tokens and cost, and the top suggestions above, as a file you can keep or share.</p>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button type="button" class="advisor-copy-btn chamfer" style="position:static" onclick="exportReportMd()">Export Markdown</button>
+        <button type="button" class="advisor-copy-btn chamfer" style="position:static" onclick="exportReportJson()">Export JSON</button>
+      </div>
+    </div>
   `
+}
+
+/** The whole session (every agent, its cost, and the top suggestions) for the Export buttons above. */
+function buildReportData() {
+  const g = graph
+  const sRep = sessionAdvisor(g)
+  const sc = sessionCost(g)
+  const am = active && (metas[active] || sessionList.find(x => x.id === active))
+  const agents = g.order.map(id => g.agents[id]).filter(a => a).map(a => {
+    const c = estimateCost(a)
+    return {
+      id: a.id, label: a.label, type: a.type, status: a.status,
+      inTok: a.inTok, outTok: a.outTok, cacheTok: a.cacheTok, tools: a.tools, steps: a.steps,
+      costUsd: Number(c.actual.toFixed(3)),
+    }
+  })
+  return {
+    generatedAt: new Date().toISOString(),
+    project: (am && am.project) || '',
+    overallScore: sRep.overallScore,
+    totalCost: sc.total,
+    totalSaved: sc.saved,
+    totalTokens: sRep.totalTokens,
+    cacheRate: sRep.cacheRate,
+    agents,
+    suggestions: sRep.topSuggestions,
+  }
+}
+function downloadFile(filename, text) {
+  const blob = new Blob([text], { type: 'text/plain' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+function exportReportJson() {
+  downloadFile(`agent-flow-report-${Date.now()}.json`, JSON.stringify(buildReportData(), null, 2))
+}
+function exportReportMd() {
+  const d = buildReportData()
+  const lines = ['# AGENT//FLOW session report', '', `Generated: ${d.generatedAt}`]
+  if (d.project) lines.push(`Project: ${d.project}`)
+  lines.push(
+    '', '## Summary',
+    `- Efficiency score: ${d.overallScore}/100`,
+    `- Estimated cost: $${d.totalCost.toFixed(2)} (saved $${d.totalSaved.toFixed(2)} via prompt caching)`,
+    `- Total tokens: ${fmt(d.totalTokens)}`,
+    `- Cache hit rate: ${Math.round(d.cacheRate * 100)}%`,
+    '', '## Agents',
+    '| Agent | Type | Status | In | Out | Cache | Tools | Cost |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- |',
+  )
+  for (const a of d.agents) lines.push(`| ${a.label} | ${a.type} | ${a.status} | ${fmt(a.inTok)} | ${fmt(a.outTok)} | ${fmt(a.cacheTok)} | ${a.tools} | $${a.costUsd.toFixed(3)} |`)
+  if (d.suggestions.length) {
+    lines.push('', '## Top suggestions')
+    for (const s of d.suggestions) lines.push(`- **[${s.severity}] ${s.title}** — ${s.summary}`)
+  }
+  downloadFile(`agent-flow-report-${Date.now()}.md`, `${lines.join('\n')}\n`)
+}
+
+// ---------- tasks: a kanban board of every agent's todos, so a big parallel fan-out stays legible ----------
+function tasksTab(g) {
+  const cols = { pending: [], in_progress: [], completed: [] }
+  for (const id of g.order) {
+    const a = g.agents[id]
+    if (!a || !a.todos) continue
+    for (const t of a.todos) {
+      const bucket = cols[t.status] || cols.pending
+      bucket.push({ ...t, ownerId: id, ownerLabel: a.label, ownerColor: colorOf(a) })
+    }
+  }
+  const total = cols.pending.length + cols.in_progress.length + cols.completed.length
+  if (total === 0) return '<p class="note">No tasks tracked yet. They show up here from TodoWrite or TaskCreate/TaskUpdate calls, across every agent.</p>'
+  const card = t => `<li class="kanban-card">
+    <div class="kanban-text">${esc(t.status === 'in_progress' && t.active ? t.active : t.text)}</div>
+    <button type="button" class="kanban-owner" data-id="${esc(t.ownerId)}" style="color:${t.ownerColor}">● ${esc(t.ownerLabel)}</button>
+  </li>`
+  const column = (key, title) => `<div class="kanban-col">
+    <h4>${title} <span>${cols[key].length}</span></h4>
+    <ul class="kanban-list">${cols[key].map(card).join('') || '<li class="kanban-empty">—</li>'}</ul>
+  </div>`
+  return `<div class="kanban-head">${cols.completed.length} / ${total} tasks done, across ${new Set([...cols.pending, ...cols.in_progress, ...cols.completed].map(t => t.ownerId)).size} agent(s)</div>
+    <div class="kanban-board">
+      ${column('pending', 'To do')}
+      ${column('in_progress', 'In progress')}
+      ${column('completed', 'Done')}
+    </div>`
+}
+
+// ---------- history: past runs, cross-session, and comparing two of them ----------
+let cmpSel = []
+function toggleCompare(sid) {
+  const i = cmpSel.indexOf(sid)
+  if (i >= 0) cmpSel.splice(i, 1)
+  else { cmpSel.push(sid); if (cmpSel.length > 2) cmpSel.shift() }
+  renderRail()
+}
+function deltaStr(a, b, unit) {
+  const d = b - a
+  const sign = d > 0 ? '+' : ''
+  return unit === '$' ? `${sign}$${d.toFixed(2)}` : unit === 'pp' ? `${sign}${Math.round(d)}pp` : `${sign}${Math.round(d)}`
+}
+function compareRows(a, b) {
+  if (!a || !b) return ''
+  const rows = [
+    ['Cost', `$${a.totalCost.toFixed(2)}`, `$${b.totalCost.toFixed(2)}`, deltaStr(a.totalCost, b.totalCost, '$')],
+    ['Tokens', fmt(a.totalTokens), fmt(b.totalTokens), deltaStr(a.totalTokens, b.totalTokens)],
+    ['Efficiency score', a.overallScore, b.overallScore, deltaStr(a.overallScore, b.overallScore)],
+    ['Cache rate', `${Math.round(a.cacheRate * 100)}%`, `${Math.round(b.cacheRate * 100)}%`, deltaStr(a.cacheRate * 100, b.cacheRate * 100, 'pp')],
+    ['Agents', a.agentCount, b.agentCount, deltaStr(a.agentCount, b.agentCount)],
+  ]
+  return `<h4>Comparing two runs</h4>
+    <table class="compare-table">
+      <tr><th></th><th>${esc(a.project || a.sessionId)}</th><th>${esc(b.project || b.sessionId)}</th><th>Δ</th></tr>
+      ${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join('')}
+    </table>`
+}
+function historyTab() {
+  const items = runHistory.slice().sort((a, b) => (b.lastSeenAt || 0) - (a.lastSeenAt || 0))
+  if (!items.length) return '<p class="note">No finished runs recorded yet. History fills in a few seconds into each session, and survives restarts.</p>'
+  const toolTotals = {}, typeTotals = {}
+  let totalCost = 0
+  for (const it of items) {
+    totalCost += it.totalCost || 0
+    for (const [k, v] of Object.entries(it.toolCounts || {})) toolTotals[k] = (toolTotals[k] || 0) + v
+    for (const [k, v] of Object.entries(it.agentTypeCounts || {})) typeTotals[k] = (typeTotals[k] || 0) + v
+  }
+  const topTool = Object.entries(toolTotals).sort((a, b) => b[1] - a[1])[0]
+  const topType = Object.entries(typeTotals).sort((a, b) => b[1] - a[1])[0]
+  const header = `<div class="advisor-grid">
+    <div class="advisor-cell"><b>$${totalCost.toFixed(2)}</b><span>Cost over ${items.length} run${items.length > 1 ? 's' : ''}</span></div>
+    <div class="advisor-cell"><b>${topTool ? esc(topTool[0]) : '—'}</b><span>Most-used tool${topTool ? ` (${topTool[1]}x)` : ''}</span></div>
+    <div class="advisor-cell"><b>${topType ? esc(topType[0]) : '—'}</b><span>Most-used agent type${topType ? ` (${topType[1]}x)` : ''}</span></div>
+  </div>`
+  const rows = items.map(it => {
+    const checked = cmpSel.includes(it.sessionId)
+    return `<li class="history-row${checked ? ' picked' : ''}">
+      <button type="button" data-cmp="${esc(it.sessionId)}" class="history-pick" title="Pick to compare (up to 2)">${checked ? '☑' : '☐'}</button>
+      <div class="history-info">
+        <b>${esc(it.project || it.sessionId)}</b>
+        <span class="soft">${clock(it.startedAt)} · ran ${dur(Math.max(0, (it.lastSeenAt || it.startedAt) - it.startedAt))}</span>
+      </div>
+      <span>${it.overallScore}/100</span>
+      <span>$${(it.totalCost || 0).toFixed(2)}</span>
+      <span>${fmt(it.totalTokens || 0)} tok</span>
+    </li>`
+  }).join('')
+  const cmp = cmpSel.length === 2 ? compareRows(items.find(x => x.sessionId === cmpSel[0]), items.find(x => x.sessionId === cmpSel[1])) : ''
+  const hint = cmpSel.length === 1 ? ' — pick 1 more to compare' : cmpSel.length === 0 ? ' (pick two to compare)' : ''
+  return `${header}<h4>Recent runs${hint}</h4><ul class="history-list">${rows}</ul>${cmp}`
 }
 
 function wireItem(g, l, now) {
@@ -2084,6 +2534,10 @@ onPick($('agent'), target => {
     try { navigator.clipboard.writeText(text); cp.textContent = 'Copied!'; setTimeout(() => { cp.textContent = cp.dataset.copy.includes('CLAUDE.md') ? 'Copy Rules' : 'Copy' }, 2000) } catch {}
     return true
   }
+  const pick = target.closest('[data-cmp]')
+  if (pick) { toggleCompare(pick.dataset.cmp); return true }
+  const owner = target.closest('[data-id]')
+  if (owner) { select(owner.dataset.id); return true }
   return false
 })
 $('agent').addEventListener('toggle', e => {
@@ -2099,14 +2553,20 @@ document.querySelector('.views').addEventListener('click', e => {
   view = b.dataset.view
   for (const x of document.querySelectorAll('.views button')) x.setAttribute('aria-pressed', String(x === b))
   try { localStorage.setItem('agent-flow-view', view) } catch {}
+  if (view !== 'replay') replayPause()
+  renderReplayBar()
 })
+$('replay-play').addEventListener('click', () => { replayPlaying ? replayPause() : replayPlay() })
+$('replay-rate').addEventListener('change', () => { replayRate = Number($('replay-rate').value) || 1 })
+$('replay-seek').addEventListener('input', () => replaySeek(Number($('replay-seek').value)))
 try {
   const v = localStorage.getItem('agent-flow-view')
-  if (v === 'timeline' || v === 'map') { view = v; for (const x of document.querySelectorAll('.views button')) x.setAttribute('aria-pressed', String(x.dataset.view === v)) }
-  const tb = localStorage.getItem('agent-flow-tab'); if (tb === 'overview' || tb === 'context' || tb === 'packets' || tb === 'advisor') tab = tb
+  if (v === 'timeline' || v === 'map' || v === 'replay') { view = v; for (const x of document.querySelectorAll('.views button')) x.setAttribute('aria-pressed', String(x.dataset.view === v)) }
+  const tb = localStorage.getItem('agent-flow-tab'); if (tb === 'overview' || tb === 'context' || tb === 'packets' || tb === 'advisor' || tb === 'tasks' || tb === 'history') tab = tb
   if (localStorage.getItem('agent-flow-bell')) { bellOn = true; $('bell').setAttribute('aria-pressed', 'true') }
   if (localStorage.getItem('agent-flow-done')) showDone = true
 } catch {}
+renderReplayBar()
 addEventListener('pointerdown', () => { if (bellOn && !audio) try { audio = new (window.AudioContext || window.webkitAudioContext)() } catch {} }, { once: true })
 
 // ---------- dragging orbs: a layout of your own, kept per session ----------
@@ -2366,7 +2826,10 @@ async function start() {
   else {
     load('sessions.js')
     setInterval(() => load('sessions.js'), 4000)
+    load('history.js')
+    setInterval(() => load('history.js'), 4000)
     setInterval(() => { if (active) load(base() + 'state.js') }, 120)
+    setInterval(() => { if (active) load(base() + 'replay.js') }, 3000)
     setInterval(() => { for (const x of sessionList) load('s/' + encodeURIComponent(x.id) + '/meta.js') }, 2000)
     setTimeout(() => { if (!sessionList.length) load('state.js') }, 1500) // an older single-session mod writes here
   }

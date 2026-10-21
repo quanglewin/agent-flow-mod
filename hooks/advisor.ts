@@ -5,7 +5,7 @@ import type {
   AgentFlowGraph,
   SessionAdvisorReport,
 } from '../types'
-import { clip, fmt } from './model'
+import { clip, detectLoop, fmt } from './model'
 
 /** Model pricing per 1,000,000 tokens (USD). */
 export const MODEL_PRICING: Record<string, { input: number; cacheRead: number; output: number }> = {
@@ -156,6 +156,21 @@ export function advisorReport(a: AgentFlowAgent, _g: AgentFlowGraph): AdvisorRep
       summary: 'Output tokens cost 5x more than input. The agent is producing lengthy explanations.',
       snippet: `Be concise. Return only the root cause in 2 sentences and the exact diff. Skip pleasantries.`,
       potentialSavings: 'Cuts output token billing by up to 50%',
+    })
+  }
+
+  // 5. Repeated tool call stuck in a loop
+  const loop = detectLoop(a.toolLog)
+  if (loop) {
+    score -= 20
+    items.push({
+      id: 'repeated-tool-call',
+      severity: 'warning',
+      title: `Repeated tool call (${loop.count}x in a row)`,
+      summary: `${loop.tool} ran ${loop.count} times back to back with the same input — the agent may be stuck in a loop instead of making progress.`,
+      detail: loop.detail ? `Last call: ${loop.tool} ${clip(loop.detail, 120)}` : undefined,
+      snippet: 'If a tool keeps failing the same way, stop and change approach instead of retrying unchanged.',
+      potentialSavings: 'Avoids paying for tool calls and tokens that make no progress',
     })
   }
 

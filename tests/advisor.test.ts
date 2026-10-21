@@ -95,4 +95,18 @@ describe('advisor', () => {
     expect(c.saved).toBeGreaterThan(0)
     expect(c.full).toBeGreaterThan(c.total)
   })
+
+  test('advisorReport warns when an agent is stuck repeating the same tool call', () => {
+    const g = M.emptyGraph(0)
+    M.spawn(g, { id: 'a1', type: 'Code', description: 'Fix build in src/build.ts', prompt: 'only edit `src/build.ts`' }, 0)
+    for (let i = 0; i < 4; i += 1) {
+      M.toolStart(g, 'a1', 'Bash: build', 100 + i * 10, 'Bash', 'npm run build')
+      M.toolEnd(g, 'a1', 105 + i * 10)
+    }
+    const rep = advisorReport(g.agents.a1!, g)
+    const loopItem = rep.items.find(i => i.id === 'repeated-tool-call')
+    expect(loopItem).toBeDefined()
+    expect(loopItem?.severity).toBe('warning')
+    expect(loopItem?.title).toContain('4x')
+  })
 })

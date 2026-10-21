@@ -14,8 +14,13 @@ When Claude starts subagents, it is hard to tell who is doing what, how far alon
 - **"Is it done yet?"** A status box shows RUNNING or DONE, how many planned steps are finished, and a time estimate based on earlier runs. Turn on the bell to get a sound and a notification when it finishes.
 - **Every message.** Click any task or report to read it in full: the exact prompt an agent was given and the answer it sent back.
 - **What each agent sees.** The Context tab lists what is in an agent's context window: its task, its tool calls, and the results.
-- **Prompt & Token Efficiency Advisor.** Real-time efficiency score (0–100), estimated USD cost, and prompt cache savings. Detects token waste patterns (unconstrained search, low cache hits, conversational bloat), suggests 1-click prompt improvements, and generates custom `CLAUDE.md` rules to prevent token bleed.
+- **Prompt & Token Efficiency Advisor.** Real-time efficiency score (0–100), estimated USD cost, and prompt cache savings. Detects token waste patterns (unconstrained search, low cache hits, conversational bloat, an agent stuck repeating the same tool call), suggests 1-click prompt improvements, and generates custom `CLAUDE.md` rules to prevent token bleed.
 - **A timeline.** When each agent started and finished, how fast it wrote, and every tool call.
+- **A replay.** Scrub through a finished (or still running) session from snapshots taken every couple of seconds, with play/pause and speed controls.
+- **Run history and compare.** Every session is remembered (cost, tokens, score, most-used tools and agent types), across restarts. Pick any two runs to see what changed.
+- **A budget alert.** Set a USD threshold and get a sound and notification once a session's estimated cost passes it.
+- **Export.** One click (or `/agent-flow export`) turns a session into a Markdown or JSON report you can keep or share.
+- **Open in your editor.** Click a Read/Write/Edit call in an agent's tool log to open that file in VS Code or Cursor.
 - **One tab per session.** Running Claude Code in several windows? Each one gets its own tab.
 
 Finished agents leave the map after a minute so you can focus on what is running. Click "Show" to bring them back.
@@ -45,6 +50,10 @@ In Claude Code:
 | `/agent-flow web demo` | Play a demo, no real agents needed |
 | `/agent-flow web off` | Stop sending this session to the dashboard |
 | `/agent-flow advisor` | Terminal summary of session token efficiency, cost, and prompt tips |
+| `/agent-flow budget <amount>` | Flag this session once its cost passes `<amount>` USD (`budget off` clears it) |
+| `/agent-flow export` or `export json` | Write this session's report to a Markdown or JSON file |
+| `/agent-flow history` | List recent runs, with the most-used tool and agent type |
+| `/agent-flow compare [a] [b]` | Diff two runs' cost, tokens, score and cache rate (defaults to the two most recent) |
 | `/agent-flow` | Show the map inside Claude Code (terminal or desktop app) |
 | `/agent-flow compact` or `detail` | Circles or cards inside Claude Code |
 | `/agent-flow reset` | Clear the map |

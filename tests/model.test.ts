@@ -222,4 +222,29 @@ describe('model', () => {
     expect(main?.activeStartedAt).toBeUndefined()
     expect(main?.toolLog?.[0]?.end).toBe(2000)
   })
+
+  test('detectLoop flags the same tool call repeating back to back', async () => {
+    const g = M.emptyGraph(0)
+    for (let i = 0; i < 3; i += 1) {
+      M.toolStart(g, M.MAIN, 'Bash: run tests', 1000 + i * 100, 'Bash', 'npm test')
+      M.toolEnd(g, M.MAIN, 1050 + i * 100)
+    }
+    const main = g.agents[M.MAIN]
+    expect(M.detectLoop(main?.toolLog)).toMatchObject({ tool: 'Bash', detail: 'npm test', count: 3 })
+
+    // a different call breaks the streak
+    M.toolStart(g, M.MAIN, 'Read a/b.ts', 1400, 'Read', 'a/b.ts')
+    M.toolEnd(g, M.MAIN, 1450)
+    expect(M.detectLoop(g.agents[M.MAIN]?.toolLog)).toBeUndefined()
+  })
+
+  test('detectLoop ignores a trailing call still in flight', async () => {
+    const g = M.emptyGraph(0)
+    for (let i = 0; i < 3; i += 1) {
+      M.toolStart(g, M.MAIN, 'Bash: run tests', 1000 + i * 100, 'Bash', 'npm test')
+      M.toolEnd(g, M.MAIN, 1050 + i * 100)
+    }
+    M.toolStart(g, M.MAIN, 'Grep foo', 1500, 'Grep', 'foo in src')
+    expect(M.detectLoop(g.agents[M.MAIN]?.toolLog)).toMatchObject({ tool: 'Bash', detail: 'npm test', count: 3 })
+  })
 })

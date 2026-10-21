@@ -121,6 +121,31 @@ describe('register', () => {
     expect(opened).toEqual(['agent-flow'])
   })
 
+  test('/agent-flow budget sets, reports, and clears a USD threshold', async ($, on) => {
+    mock.clock(on)
+    on('session.start', ($, e) => ({ cwd: e.cwd }))
+    on('command.register', ($, e) => ({ value: { command: e.name } }))
+    on('ui.open', () => ({ value: { isPlaced: true as const } }))
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+
+    const run = (args: string) => $.command.run({ command: 'agent-flow', args, origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 120 } })
+
+    const none = await run('budget')
+    expect(none.text).toContain('No budget set')
+
+    const set = await run('budget 5')
+    expect(set.text).toContain('$5.00')
+
+    const status = await run('budget')
+    expect(status.text).toContain('Budget: $5.00')
+    expect(status.text).toContain('Current session cost: $0.00')
+
+    const off = await run('budget off')
+    expect(off.text).toContain('off')
+    const clearedStatus = await run('budget')
+    expect(clearedStatus.text).toContain('No budget set')
+  })
+
   test('streaming tokens do not rebuild the desktop SVG; a packet does', async ($, on) => {
     const clock = mock.clock(on)
     on('session.start', ($, e) => ({ cwd: e.cwd }))
@@ -184,6 +209,73 @@ describe('register', () => {
       await ui.unmount()
     })
   }
+
+  test('/agent-flow history records this run, and compare needs a second one', async ($, on) => {
+    mock.clock(on)
+    mock.store(on)
+    on('session.start', ($, e) => ({ cwd: e.cwd }))
+    on('command.register', ($, e) => ({ value: { command: e.name } }))
+    on('ui.open', () => ({ value: { isPlaced: true as const } }))
+    on('agent.spawn', () => ({ model: 'claude-haiku', agentId: 'agent-1' }))
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work/proj' })
+    await $.agent.spawn({
+      tool_use_id: 'toolu_1',
+      prompt: 'Find where auth happens',
+      description: 'Find auth code',
+      subagentType: 'Explore',
+      provider: { plugin: 'engine', tier: 'core' },
+      parentModel: 'claude-opus',
+      background: false,
+      fork: false,
+    })
+    const run = (args: string) => $.command.run({ command: 'agent-flow', args, origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 120 } })
+
+    const history = await run('history')
+    expect(history.text).toContain('1 run')
+    expect(history.text).toContain('proj') // project name, derived from cwd
+
+    const compare = await run('compare')
+    expect(compare.text).toContain('Not enough recorded runs')
+  })
+
+  test('/agent-flow export writes a session report to the working directory', async ($, on) => {
+    mock.clock(on)
+    mock.store(on)
+    const files: Record<string, string> = {}
+    on('session.start', ($, e) => ({ cwd: e.cwd }))
+    on('command.register', ($, e) => ({ value: { command: e.name } }))
+    on('ui.open', () => ({ value: { isPlaced: true as const } }))
+    on('agent.spawn', () => ({ model: 'claude-haiku', agentId: 'agent-1' }))
+    on('fs.write', ($, e) => {
+      files[e.path] = e.text
+      return { value: undefined }
+    })
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work/proj' })
+    await $.agent.spawn({
+      tool_use_id: 'toolu_1',
+      prompt: 'Find where auth happens',
+      description: 'Find auth code',
+      subagentType: 'Explore',
+      provider: { plugin: 'engine', tier: 'core' },
+      parentModel: 'claude-opus',
+      background: false,
+      fork: false,
+    })
+
+    const md = await $.command.run({ command: 'agent-flow', args: 'export', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 120 } })
+    expect(md.text).toContain('Wrote the session report to')
+    const mdPath = Object.keys(files).find(p => /agent-flow-report-\d+\.md$/.test(p))
+    expect(mdPath).toBeDefined()
+    expect(files[mdPath!]).toContain('# AGENT//FLOW session report')
+    expect(files[mdPath!]).toContain('Explore #1')
+
+    const json = await $.command.run({ command: 'agent-flow', args: 'export json', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 120 } })
+    expect(json.text).toContain('Wrote the session report to')
+    const jsonPath = Object.keys(files).find(p => /agent-flow-report-\d+\.json$/.test(p))
+    expect(jsonPath).toBeDefined()
+    const parsed = JSON.parse(files[jsonPath!]!)
+    expect(parsed.agents.some((a: { label: string }) => a.label === 'Explore #1')).toBe(true)
+  })
 
   test('/agent-flow web demo writes a demo copy of the page and opens it', async ($, on) => {
     mock.clock(on)
@@ -289,6 +381,11 @@ describe('register', () => {
     const kinds = cx.agents['agent-1'].entries.map((x: { kind: string }) => x.kind)
     expect(kinds).toEqual(['prompt', 'call', 'result'])
     expect(cx.agents['agent-1'].entries[2].title).toBe('Result of Read src/auth.ts')
+
+    const replay = files[`${dir}replay.js`] ?? ''
+    const rp = JSON.parse(replay.slice(replay.indexOf('(') + 1, replay.lastIndexOf(')')))
+    expect(rp.snaps.length).toBeGreaterThan(0)
+    expect(rp.snaps[0].graph.agents['agent-1'].label).toBe('Explore #1')
   })
 
   for (const [name, env, root, opener] of [

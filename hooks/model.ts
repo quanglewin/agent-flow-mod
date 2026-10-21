@@ -4,6 +4,7 @@ import type {
   AgentFlowLink,
   AgentFlowLinkKind,
   AgentFlowTodo,
+  AgentFlowToolEntry,
 } from '../types'
 
 /** The main loop's id in the graph (its events carry no agentId). */
@@ -377,6 +378,32 @@ export function toolEnd(g: AgentFlowGraph, id: string, now: number): void {
       break
     }
   }
+}
+
+const LOOP_MIN_REPEATS = 3
+
+/**
+ * Detects a repeated tool call stuck in a loop: the same (tool, detail) pair firing
+ * `LOOP_MIN_REPEATS` or more times in a row at the tail of the log (ignoring calls still
+ * in flight). Returns the repeated call and how many times it ran back to back, or
+ * undefined when nothing in the trailing run repeats.
+ */
+export function detectLoop(toolLog: AgentFlowToolEntry[] | undefined): { tool: string; detail?: string; count: number } | undefined {
+  const log = toolLog ?? []
+  const finished = log.filter(e => e.end !== undefined)
+  if (finished.length < LOOP_MIN_REPEATS) return undefined
+  const key = (e: AgentFlowToolEntry) => `${e.tool ?? ''}\u0000${e.detail ?? ''}`
+  const last = finished[finished.length - 1]
+  if (!last || !last.tool) return undefined
+  const wantKey = key(last)
+  let count = 0
+  for (let i = finished.length - 1; i >= 0; i -= 1) {
+    const entry = finished[i]
+    if (!entry || key(entry) !== wantKey) break
+    count += 1
+  }
+  if (count < LOOP_MIN_REPEATS) return undefined
+  return { tool: last.tool, detail: last.detail, count }
 }
 
 // ── External process nodes ──────────────────────────────────────────────────
