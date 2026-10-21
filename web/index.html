@@ -425,6 +425,8 @@
 <script>
 'use strict'
 const NEON = ['#00F0FF', '#FF2BD6', '#39FF14', '#FFE600', '#B026FF', '#FF8A00', '#FF3864', '#00FFA3']
+/** A ring around the orb's center icon is tinted by model tier: opus gold, sonnet cyan, haiku green. */
+const TIER_COLOR = { opus: '#ffd24c', sonnet: '#00e5ff', haiku: '#3dff8f' }
 const MAIN = 'main'
 const MAIN_TURN = '(main turn)'
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -1313,6 +1315,14 @@ function drawOrb(a, n, t) {
 
   // the task's icon in the middle
   icon(taskIcon(a), x, y, r * 0.52, running ? '#ffffff' : c, running ? 0.95 : 0.8)
+  // which model it runs on: a thin ring hugging that center icon, no text needed
+  if (a.model) {
+    const tierColor = TIER_COLOR[modelTier(a.model)] || '#9188bc'
+    ctx.beginPath(); ctx.arc(x, y, r * 0.63, 0, Math.PI * 2)
+    ctx.lineWidth = 1.4; ctx.strokeStyle = rgba(tierColor, running ? 0.9 : 0.55)
+    ctx.shadowColor = tierColor; ctx.shadowBlur = running ? 7 : 0
+    ctx.stroke(); ctx.shadowBlur = 0
+  }
   // a badge on the rim: the tool running now, or how it ended
   const bx = x + r * 0.72, by = y + r * 0.72, br = Math.max(7, r * 0.3)
   const badge = (fill, edge) => {
